@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .config import DEFAULT_MU, DEFAULT_SIGMA, STATIC_DIR
+from .config import DEFAULT_INITIAL_BALANCE, DEFAULT_MU, DEFAULT_SIGMA, STATIC_DIR
 from .history import history_payload, history_stats_from, load_history_frame
 from .simulation import SimulationInputs, simulation_payload
 
@@ -16,6 +16,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 class SimulationRequest(BaseModel):
+    initial_balance: float = Field(default=DEFAULT_INITIAL_BALANCE, ge=0)
     withdrawal: float = Field(default=10_000.0, ge=0)
     mu: float = Field(default=DEFAULT_MU)
     sigma: float = Field(default=DEFAULT_SIGMA, ge=0)
@@ -47,6 +48,7 @@ def get_history_stats(start_quarter: str) -> dict[str, object]:
 @app.post("/api/simulate")
 def post_simulation(request: SimulationRequest) -> dict[str, object]:
     inputs = SimulationInputs(
+        initial_balance=request.initial_balance,
         withdrawal=request.withdrawal,
         mu=request.mu,
         sigma=request.sigma,

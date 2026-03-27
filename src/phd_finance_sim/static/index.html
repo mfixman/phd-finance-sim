@@ -14,13 +14,17 @@
         <p class="eyebrow">PhD Runway Planner</p>
         <h1>Quarterly withdrawals against an S&amp;P 500 balance.</h1>
         <p class="summary">
-          Starts at £303,200, applies your withdrawal schedule, and simulates the remaining balance with a
-          lognormal quarterly growth model.
+          Starts from your chosen initial balance, applies your withdrawal schedule, and simulates the remaining
+          balance with a lognormal quarterly growth model.
         </p>
       </section>
 
       <section class="panel controls">
         <div class="field-grid">
+          <label>
+            <span>Initial value</span>
+            <input id="initialBalance" type="number" min="0" step="100" value="303200" />
+          </label>
           <label>
             <span>Quarterly withdrawal X</span>
             <input id="withdrawal" type="number" min="0" step="100" value="10000" />
@@ -56,7 +60,7 @@
           <p id="historyStats">Loading history...</p>
           <p id="effectiveStats"></p>
           <p>
-            Projection starts at Q4 2026 with the initial balance. Q1-Q2 2027 withdraw £0; from Q3 2027 through
+            Projection starts at Q4 2026 with the chosen initial balance. Q1-Q2 2027 withdraw £0; from Q3 2027 through
             Q4 2029 withdraw £X each quarter, with an extra £10k at Q3 2027 and Q3 2028.
           </p>
         </div>

@@ -166,6 +166,7 @@ async function applyHistoryStats() {
 
 async function runSimulation() {
   const payload = {
+    initial_balance: Number(document.getElementById("initialBalance").value),
     withdrawal: Number(document.getElementById("withdrawal").value),
     mu: Number(document.getElementById("mu").value),
     sigma: Number(document.getElementById("sigma").value),

@@ -3,13 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 
-from .config import DEFAULT_MU, DEFAULT_SIGMA, DEFAULT_SIMULATIONS, DEFAULT_WITHDRAWAL
+from .config import DEFAULT_INITIAL_BALANCE, DEFAULT_MU, DEFAULT_SIGMA, DEFAULT_SIMULATIONS, DEFAULT_WITHDRAWAL
 from .history import history_stats_from, load_history_frame
 from .simulation import SimulationInputs, simulation_payload
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the PhD finance simulation.")
+    parser.add_argument("--initial-balance", type=float, default=DEFAULT_INITIAL_BALANCE)
     parser.add_argument("--withdrawal", type=float, default=DEFAULT_WITHDRAWAL)
     parser.add_argument("--mu", type=float, default=DEFAULT_MU)
     parser.add_argument("--sigma", type=float, default=DEFAULT_SIGMA)
@@ -38,6 +39,7 @@ def main() -> None:
 
     payload = simulation_payload(
         SimulationInputs(
+            initial_balance=args.initial_balance,
             withdrawal=args.withdrawal,
             mu=mu,
             sigma=sigma,
