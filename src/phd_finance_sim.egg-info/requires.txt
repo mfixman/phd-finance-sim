@@ -1,0 +1,9 @@
+fastapi<1.0,>=0.116
+numpy<3.0,>=2.3
+pandas<3.0,>=2.3
+uvicorn<1.0,>=0.35
+yfinance<0.3,>=0.2.65
+
+[dev]
+httpx<1.0,>=0.28
+pytest<9.0,>=8.4

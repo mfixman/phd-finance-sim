@@ -1,0 +1,16 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_FILE = PROJECT_ROOT / "data" / "sp500_quarterly_returns.csv"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+DEFAULT_INITIAL_BALANCE = 303_200.0
+DEFAULT_WITHDRAWAL = 10_000.0
+DEFAULT_EXTRA_WITHDRAWALS = {3: 10_000.0, 7: 10_000.0}
+DEFAULT_QUARTERS = 16
+DEFAULT_SIMULATIONS = 40_000
+DEFAULT_SEED = 42
+DEFAULT_SIGMA = 0.08
+DEFAULT_MU = 0.02
