@@ -28,6 +28,40 @@ function formatTableValue(value) {
   return `${truncatedThousands}k`;
 }
 
+function tableHighlightTargets(applyTaxes) {
+  return {
+    "Q1 2026": applyTaxes ? 296000 : 308000,
+    "Q2 2026": applyTaxes ? 279000 : 288000,
+  };
+}
+
+function highlightedTwentileRows(rows, quarters, applyTaxes) {
+  const quarterTargets = tableHighlightTargets(applyTaxes);
+  const highlights = new Map();
+
+  for (const [quarterLabel, target] of Object.entries(quarterTargets)) {
+    const quarterIndex = quarters.indexOf(quarterLabel);
+    if (quarterIndex === -1) {
+      continue;
+    }
+
+    const rankedRows = rows
+      .map((row, rowIndex) => ({
+        rowIndex,
+        distance: Math.abs(row.values[quarterIndex] - target),
+      }))
+      .sort((left, right) => left.distance - right.distance || left.rowIndex - right.rowIndex);
+
+    const selectedRows = new Set([rankedRows[0].rowIndex]);
+    if (rankedRows[0].distance > 1000 && rankedRows.length > 1) {
+      selectedRows.add(rankedRows[1].rowIndex);
+    }
+    highlights.set(quarterLabel, selectedRows);
+  }
+
+  return highlights;
+}
+
 function clearIdealWithdrawalResult() {
   document.getElementById("idealWithdrawalResult").textContent = "";
 }
@@ -162,9 +196,10 @@ function renderProjectionChart(series) {
   );
 }
 
-function renderTwentileTable(rows, quarters) {
+function renderTwentileTable(rows, quarters, applyTaxes) {
   const thead = document.querySelector("#twentileTable thead");
   const tbody = document.querySelector("#twentileTable tbody");
+  const highlights = highlightedTwentileRows(rows, quarters, applyTaxes);
 
   thead.innerHTML = "";
   tbody.innerHTML = "";
@@ -180,14 +215,18 @@ function renderTwentileTable(rows, quarters) {
   }
   thead.appendChild(headRow);
 
-  for (const row of rows) {
+  for (const [rowIndex, row] of rows.entries()) {
     const tr = document.createElement("tr");
     const label = document.createElement("th");
     label.textContent = `P${row.percentile}`;
     tr.appendChild(label);
-    for (const value of row.values) {
+    for (const [quarterIndex, value] of row.values.entries()) {
       const td = document.createElement("td");
       td.textContent = formatTableValue(value);
+      const quarterLabel = quarters[quarterIndex];
+      if (highlights.get(quarterLabel)?.has(rowIndex)) {
+        td.classList.add("table-highlight");
+      }
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
@@ -245,7 +284,7 @@ async function runSimulation() {
   });
 
   renderProjectionChart(result.chart_percentiles);
-  renderTwentileTable(result.twentiles, result.quarters);
+  renderTwentileTable(result.twentiles, result.quarters, taxesEnabled());
 }
 
 async function findIdealWithdrawal() {

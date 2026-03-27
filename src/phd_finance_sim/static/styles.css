@@ -170,6 +170,11 @@ td {
   white-space: nowrap;
 }
 
+td.table-highlight {
+  font-weight: 700;
+  color: var(--ink);
+}
+
 thead th,
 tbody th {
   position: sticky;
