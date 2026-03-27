@@ -45,24 +45,25 @@ function highlightedTwentileRows(rows, quarters, applyTaxes) {
       continue;
     }
 
+    const targetShown = Math.trunc(target / 1000);
     const rankedRows = rows
       .map((row, rowIndex) => ({
         rowIndex,
-        value: row.values[quarterIndex],
-        distance: Math.abs(row.values[quarterIndex] - target),
+        shownValue: Math.trunc(row.values[quarterIndex] / 1000),
+        distance: Math.abs(Math.trunc(row.values[quarterIndex] / 1000) - targetShown),
       }))
       .sort((left, right) => left.distance - right.distance || left.rowIndex - right.rowIndex);
 
     const selectedRows = new Set([rankedRows[0].rowIndex]);
     if (rankedRows.length > 1) {
-      const firstValue = rankedRows[0].value;
-      const secondValue = rankedRows[1].value;
+      const firstValue = rankedRows[0].shownValue;
+      const secondValue = rankedRows[1].shownValue;
       const lowerValue = Math.min(firstValue, secondValue);
       const upperValue = Math.max(firstValue, secondValue);
       const q25 = lowerValue + 0.25 * (upperValue - lowerValue);
       const q75 = lowerValue + 0.75 * (upperValue - lowerValue);
 
-      if (target >= q25 && target <= q75) {
+      if (targetShown >= q25 && targetShown <= q75) {
         selectedRows.add(rankedRows[1].rowIndex);
       }
     }
