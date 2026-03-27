@@ -14,6 +14,8 @@ const currencyFormatter = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
+const DEFAULT_INITIAL_BALANCE = 303200;
+
 let historyRecords = [];
 let historyEndQuarter = "";
 
@@ -32,7 +34,7 @@ function clearIdealWithdrawalResult() {
 
 function updateEffectiveStats() {
   const payload = {
-    initial_balance: Number(document.getElementById("initialBalance").value),
+    initial_balance: DEFAULT_INITIAL_BALANCE,
     apply_taxes: taxesEnabled(),
     mu: Number(document.getElementById("mu").value),
     sigma: Number(document.getElementById("sigma").value),
@@ -44,7 +46,10 @@ function updateEffectiveStats() {
     body: JSON.stringify(payload),
   }).then((result) => {
     document.getElementById("effectiveStats").textContent =
-      `Effective starting balance ${currencyFormatter.format(result.effective_initial_balance)}. ` +
+      `Starting balance ${currencyFormatter.format(DEFAULT_INITIAL_BALANCE)}. ` +
+      `${result.apply_taxes ? "With taxes" : "Without taxes"} the effective starting balance is ${currencyFormatter.format(
+        result.effective_initial_balance
+      )}. ` +
       `Implied yearly return distribution from the selected quarterly log parameters: ` +
       `mean ${percentFormatter.format(result.yearly_mean * 100)}%, std ${percentFormatter.format(
         result.yearly_std * 100
@@ -216,7 +221,7 @@ async function applyHistoryStats(applyToInputs = true) {
 
 async function runSimulation() {
   const payload = {
-    initial_balance: Number(document.getElementById("initialBalance").value),
+    initial_balance: DEFAULT_INITIAL_BALANCE,
     apply_taxes: taxesEnabled(),
     withdrawal: Number(document.getElementById("withdrawal").value),
     mu: Number(document.getElementById("mu").value),
@@ -237,7 +242,7 @@ async function runSimulation() {
 
 async function findIdealWithdrawal() {
   const payload = {
-    initial_balance: Number(document.getElementById("initialBalance").value),
+    initial_balance: DEFAULT_INITIAL_BALANCE,
     apply_taxes: taxesEnabled(),
     mu: Number(document.getElementById("mu").value),
     sigma: Number(document.getElementById("sigma").value),
@@ -281,10 +286,6 @@ async function init() {
     applyHistoryStats();
   });
   document.getElementById("applyTaxes").addEventListener("change", refreshTaxMode);
-  document.getElementById("initialBalance").addEventListener("change", () => {
-    clearIdealWithdrawalResult();
-    updateEffectiveStats();
-  });
   document.getElementById("mu").addEventListener("change", () => {
     clearIdealWithdrawalResult();
     updateEffectiveStats();
