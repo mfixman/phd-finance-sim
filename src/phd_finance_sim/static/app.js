@@ -3,6 +3,11 @@ const numberFormatter = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 4,
 });
 
+const percentFormatter = new Intl.NumberFormat("en-GB", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const TABLE_START_YEAR = 2026;
 const TABLE_START_QUARTER = 4;
 
@@ -28,6 +33,19 @@ function buildDisplayQuarterLabels(length) {
 function formatTableValue(value) {
   const truncatedThousands = Math.trunc(value / 1000);
   return `${truncatedThousands}k`;
+}
+
+function updateEffectiveStats() {
+  const mu = Number(document.getElementById("mu").value);
+  const sigma = Number(document.getElementById("sigma").value);
+  const growthMean = Math.exp(mu + (sigma ** 2) / 2);
+  const growthVariance = (Math.exp(sigma ** 2) - 1) * Math.exp(2 * mu + sigma ** 2);
+  const returnMean = growthMean - 1;
+  const returnStd = Math.sqrt(growthVariance);
+
+  document.getElementById("effectiveStats").textContent =
+    `Implied quarterly return distribution: mean ${percentFormatter.format(returnMean * 100)}%, ` +
+    `std ${percentFormatter.format(returnStd * 100)}%.`;
 }
 
 async function fetchJson(url, options = {}) {
@@ -149,6 +167,7 @@ async function applyHistoryStats() {
   ).textContent = `From ${stats.start_quarter} onward: mu ${numberFormatter.format(stats.mu)}, sigma ${numberFormatter.format(
     stats.sigma
   )}, observations ${stats.observations}.`;
+  updateEffectiveStats();
   renderHistoryChart(historyRecords, startQuarter);
 }
 
@@ -183,6 +202,8 @@ async function init() {
   document.getElementById("useHistory").addEventListener("click", applyHistoryStats);
   document.getElementById("runSimulation").addEventListener("click", runSimulation);
   document.getElementById("startQuarter").addEventListener("change", applyHistoryStats);
+  document.getElementById("mu").addEventListener("input", updateEffectiveStats);
+  document.getElementById("sigma").addEventListener("input", updateEffectiveStats);
 }
 
 window.addEventListener("DOMContentLoaded", () => {
