@@ -171,8 +171,14 @@ td {
 }
 
 td.table-highlight {
+  background: rgba(241, 180, 121, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(217, 95, 2, 0.18);
   font-weight: 700;
   color: var(--ink);
+}
+
+td.table-highlight strong {
+  font-weight: 800;
 }
 
 thead th,

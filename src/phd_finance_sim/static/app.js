@@ -222,10 +222,15 @@ function renderTwentileTable(rows, quarters, applyTaxes) {
     tr.appendChild(label);
     for (const [quarterIndex, value] of row.values.entries()) {
       const td = document.createElement("td");
-      td.textContent = formatTableValue(value);
+      const displayValue = formatTableValue(value);
       const quarterLabel = quarters[quarterIndex];
       if (highlights.get(quarterLabel)?.has(rowIndex)) {
         td.classList.add("table-highlight");
+        const strong = document.createElement("strong");
+        strong.textContent = displayValue;
+        td.appendChild(strong);
+      } else {
+        td.textContent = displayValue;
       }
       tr.appendChild(td);
     }
