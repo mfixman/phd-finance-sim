@@ -49,5 +49,7 @@ def test_ideal_withdrawal_endpoint_returns_recommendation() -> None:
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["recommended_withdrawal"] == 10000.0
-    assert payload["achieved_balance"] == 100000.0
+    assert payload["recommended_withdrawal"] == 10800.0
+    assert payload["achieved_balance"] == 99600.0
+    assert payload["target_quarter"] == "Q4 2029"
+    assert payload["target_timing"] == "beginning"

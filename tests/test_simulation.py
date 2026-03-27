@@ -69,5 +69,7 @@ def test_ideal_withdrawal_search_hits_target_in_simple_case() -> None:
         target_balance=100_000.0,
         step=100.0,
     )
-    assert result["recommended_withdrawal"] == 10_000.0
-    assert result["achieved_balance"] == 100_000.0
+    assert result["recommended_withdrawal"] == 10_800.0
+    assert result["achieved_balance"] == 99_600.0
+    assert result["target_quarter"] == "Q4 2029"
+    assert result["target_timing"] == "beginning"

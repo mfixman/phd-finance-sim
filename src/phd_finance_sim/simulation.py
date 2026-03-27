@@ -123,9 +123,13 @@ def percentile_table(simulated_balances: np.ndarray, percentiles: list[int]) -> 
     return np.percentile(simulated_balances, percentiles, axis=0)
 
 
-def final_percentile_balance(inputs: SimulationInputs, percentile: int = 5) -> float:
+def percentile_balance_at_index(inputs: SimulationInputs, percentile: int = 5, balance_index: int = -1) -> float:
     simulated = simulate_balances(inputs)
-    return float(np.percentile(simulated[:, -1], percentile))
+    return float(np.percentile(simulated[:, balance_index], percentile))
+
+
+def ideal_withdrawal_target_index(inputs: SimulationInputs) -> int:
+    return max(inputs.quarters - 1, 0)
 
 
 def ideal_withdrawal_search(
@@ -134,8 +138,10 @@ def ideal_withdrawal_search(
     percentile: int = 5,
     step: float = 100.0,
     max_withdrawal: float = 500_000.0,
-) -> dict[str, float | int | bool]:
-    baseline_balance = final_percentile_balance(inputs, percentile=percentile)
+) -> dict[str, float | int | bool | str]:
+    target_index = ideal_withdrawal_target_index(inputs)
+    target_quarter = projection_quarter_labels(inputs.quarters)[-1]
+    baseline_balance = percentile_balance_at_index(inputs, percentile=percentile, balance_index=target_index)
     if baseline_balance <= target_balance:
         recommended = 0.0
         achieved = baseline_balance
@@ -144,12 +150,14 @@ def ideal_withdrawal_search(
             "achieved_balance": achieved,
             "target_balance": target_balance,
             "percentile": percentile,
+            "target_quarter": target_quarter,
+            "target_timing": "beginning",
             "within_tolerance": abs(achieved - target_balance) <= step,
         }
 
     low = 0.0
     high = max(step, inputs.withdrawal, 1_000.0)
-    high_result = final_percentile_balance(
+    high_result = percentile_balance_at_index(
         SimulationInputs(
             initial_balance=inputs.initial_balance,
             apply_taxes=inputs.apply_taxes,
@@ -160,13 +168,14 @@ def ideal_withdrawal_search(
             simulations=inputs.simulations,
             seed=inputs.seed,
         ),
+        balance_index=target_index,
         percentile=percentile,
     )
 
     while high_result > target_balance and high < max_withdrawal:
         low = high
         high = min(high * 2, max_withdrawal)
-        high_result = final_percentile_balance(
+        high_result = percentile_balance_at_index(
             SimulationInputs(
                 initial_balance=inputs.initial_balance,
                 apply_taxes=inputs.apply_taxes,
@@ -177,6 +186,7 @@ def ideal_withdrawal_search(
                 simulations=inputs.simulations,
                 seed=inputs.seed,
             ),
+            balance_index=target_index,
             percentile=percentile,
         )
 
@@ -188,12 +198,14 @@ def ideal_withdrawal_search(
             "achieved_balance": achieved,
             "target_balance": target_balance,
             "percentile": percentile,
+            "target_quarter": target_quarter,
+            "target_timing": "beginning",
             "within_tolerance": False,
         }
 
     while high - low > step:
         mid = round(((low + high) / 2) / step) * step
-        mid_result = final_percentile_balance(
+        mid_result = percentile_balance_at_index(
             SimulationInputs(
                 initial_balance=inputs.initial_balance,
                 apply_taxes=inputs.apply_taxes,
@@ -204,6 +216,7 @@ def ideal_withdrawal_search(
                 simulations=inputs.simulations,
                 seed=inputs.seed,
             ),
+            balance_index=target_index,
             percentile=percentile,
         )
         if mid_result > target_balance:
@@ -218,7 +231,7 @@ def ideal_withdrawal_search(
     for candidate in candidates:
         if candidate < 0 or candidate > max_withdrawal:
             continue
-        achieved = final_percentile_balance(
+        achieved = percentile_balance_at_index(
             SimulationInputs(
                 initial_balance=inputs.initial_balance,
                 apply_taxes=inputs.apply_taxes,
@@ -229,6 +242,7 @@ def ideal_withdrawal_search(
                 simulations=inputs.simulations,
                 seed=inputs.seed,
             ),
+            balance_index=target_index,
             percentile=percentile,
         )
         distance = abs(achieved - target_balance)
@@ -242,6 +256,8 @@ def ideal_withdrawal_search(
         "achieved_balance": float(best_balance),
         "target_balance": target_balance,
         "percentile": percentile,
+        "target_quarter": target_quarter,
+        "target_timing": "beginning",
         "within_tolerance": abs(best_balance - target_balance) <= step,
     }
 
