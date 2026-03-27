@@ -1,15 +1,34 @@
-const currencyFormatter = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 0,
-});
-
 const numberFormatter = new Intl.NumberFormat("en-GB", {
   minimumFractionDigits: 4,
   maximumFractionDigits: 4,
 });
 
+const TABLE_START_YEAR = 2026;
+const TABLE_START_QUARTER = 4;
+
 let historyRecords = [];
+
+function buildDisplayQuarterLabels(length) {
+  const labels = [];
+  let year = TABLE_START_YEAR;
+  let quarter = TABLE_START_QUARTER;
+
+  for (let index = 0; index < length; index += 1) {
+    labels.push(`Q${quarter} ${year}`);
+    quarter += 1;
+    if (quarter === 5) {
+      quarter = 1;
+      year += 1;
+    }
+  }
+
+  return labels;
+}
+
+function formatTableValue(value) {
+  const truncatedThousands = Math.trunc(value / 1000);
+  return `${truncatedThousands}k`;
+}
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
@@ -74,6 +93,7 @@ function renderProjectionChart(series) {
     "projectionChart",
     traces,
     {
+      showlegend: false,
       margin: { t: 12, r: 12, b: 48, l: 72 },
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
@@ -89,6 +109,7 @@ function renderProjectionChart(series) {
 function renderTwentileTable(rows, quarters) {
   const thead = document.querySelector("#twentileTable thead");
   const tbody = document.querySelector("#twentileTable tbody");
+  const displayQuarters = buildDisplayQuarterLabels(quarters.length);
 
   thead.innerHTML = "";
   tbody.innerHTML = "";
@@ -97,7 +118,7 @@ function renderTwentileTable(rows, quarters) {
   const corner = document.createElement("th");
   corner.textContent = "Percentile";
   headRow.appendChild(corner);
-  for (const quarter of quarters) {
+  for (const quarter of displayQuarters) {
     const cell = document.createElement("th");
     cell.textContent = quarter;
     headRow.appendChild(cell);
@@ -111,7 +132,7 @@ function renderTwentileTable(rows, quarters) {
     tr.appendChild(label);
     for (const value of row.values) {
       const td = document.createElement("td");
-      td.textContent = currencyFormatter.format(value);
+      td.textContent = formatTableValue(value);
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
