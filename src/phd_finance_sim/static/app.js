@@ -186,6 +186,12 @@ async function applyHistoryStats(applyToInputs = true) {
   const stats = await fetchJson(
     `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=${taxesEnabled()}`
   );
+  const untaxedStats = await fetchJson(
+    `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=false`
+  );
+  const taxedStats = await fetchJson(
+    `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=true`
+  );
   if (applyToInputs) {
     document.getElementById("mu").value = stats.mu.toFixed(4);
     document.getElementById("sigma").value = stats.sigma.toFixed(4);
@@ -199,6 +205,15 @@ async function applyHistoryStats(applyToInputs = true) {
     )}% per year. ` +
     `Quarterly log mu ${numberFormatter.format(stats.mu)}, quarterly log sigma ${numberFormatter.format(stats.sigma)}, ` +
     `${stats.observations} quarterly observations.`;
+  document.getElementById("verificationStats").textContent =
+    `Verification for ${startQuarter} to ${stats.end_quarter}: ` +
+    `without taxes annualized growth ${percentFormatter.format(untaxedStats.annualized_return * 100)}% per year, ` +
+    `quarterly log mu ${numberFormatter.format(untaxedStats.mu)}, quarterly log sigma ${numberFormatter.format(
+      untaxedStats.sigma
+    )}; with taxes annualized growth ${percentFormatter.format(taxedStats.annualized_return * 100)}% per year, ` +
+    `quarterly log mu ${numberFormatter.format(taxedStats.mu)}, quarterly log sigma ${numberFormatter.format(
+      taxedStats.sigma
+    )}. Sigma here is a standard deviation of log returns, so it is not a percent figure.`;
   await updateEffectiveStats();
   renderHistoryChart(historyRecords, startQuarter, stats.end_quarter);
 }
