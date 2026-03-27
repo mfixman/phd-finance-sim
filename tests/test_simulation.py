@@ -45,14 +45,14 @@ def test_payload_contains_twentile_rows_for_each_quarter() -> None:
     payload = simulation_payload(
         SimulationInputs(initial_balance=400_000.0, withdrawal=5_000.0, mu=0.01, sigma=0.02, simulations=100, seed=1)
     )
-    assert payload["quarters"][0] == "Q4 2026"
+    assert payload["quarters"][0] == "Q4 2025"
     assert payload["quarters"][-1] == "Q4 2029"
-    assert len(payload["quarters"]) == 13
+    assert len(payload["quarters"]) == 17
     assert payload["chart_percentiles"][3]["values"][0] == 400000.0
     assert len(payload["chart_percentiles"]) == 7
     assert len(payload["twentiles"]) == 20
     assert payload["twentiles"][0]["percentile"] == 5
-    assert len(payload["twentiles"][0]["values"]) == 13
+    assert len(payload["twentiles"][0]["values"]) == 17
 
 
 def test_tax_mode_reduces_effective_initial_balance() -> None:
@@ -65,7 +65,7 @@ def test_tax_mode_reduces_effective_initial_balance() -> None:
 
 def test_ideal_withdrawal_search_hits_target_in_simple_case() -> None:
     result = ideal_withdrawal_search(
-        SimulationInputs(initial_balance=220_000.0, withdrawal=0.0, mu=0.0, sigma=0.0, simulations=10, seed=1),
+        SimulationInputs(initial_balance=260_000.0, withdrawal=0.0, mu=0.0, sigma=0.0, simulations=10, seed=1),
         target_balance=100_000.0,
         step=100.0,
     )

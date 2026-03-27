@@ -266,7 +266,7 @@ async function findIdealWithdrawal() {
 
   document.getElementById("withdrawal").value = result.recommended_withdrawal.toFixed(0);
   document.getElementById("idealWithdrawalResult").textContent =
-    `Ideal X for a 5th percentile of £100k at the start of Q4 2029: ` +
+    `Ideal X for a 5th percentile of £100k at Q4 2029: ` +
     `${currencyFormatter.format(result.recommended_withdrawal)}. ` +
     `Achieved 5th percentile: ${currencyFormatter.format(result.achieved_balance)}.`;
   await runSimulation();

@@ -24,7 +24,7 @@ def test_simulate_endpoint_returns_chart_and_twentiles() -> None:
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["quarters"][0] == "Q4 2026"
+    assert payload["quarters"][0] == "Q4 2025"
     assert payload["quarters"][-1] == "Q4 2029"
     assert payload["chart_percentiles"][3]["values"][0] == 400000.0
     assert len(payload["chart_percentiles"]) == 7
@@ -45,7 +45,7 @@ def test_simulate_endpoint_applies_taxes_to_initial_balance() -> None:
 def test_ideal_withdrawal_endpoint_returns_recommendation() -> None:
     response = client.post(
         "/api/ideal-withdrawal",
-        json={"initial_balance": 220000, "mu": 0.0, "sigma": 0.0, "simulations": 100, "seed": 1},
+        json={"initial_balance": 260000, "mu": 0.0, "sigma": 0.0, "simulations": 100, "seed": 1},
     )
     assert response.status_code == 200
     payload = response.json()

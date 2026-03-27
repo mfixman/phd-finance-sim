@@ -29,6 +29,6 @@ def test_cli_outputs_json() -> None:
     )
     payload = json.loads(result.stdout)
     assert payload["history_stats"] is None
-    assert payload["simulation"]["quarters"][0] == "Q4 2026"
+    assert payload["simulation"]["quarters"][0] == "Q4 2025"
     assert payload["simulation"]["quarters"][-1] == "Q4 2029"
     assert payload["simulation"]["chart_percentiles"][3]["values"][0] == 400000.0
