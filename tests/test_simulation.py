@@ -41,6 +41,21 @@ def test_simulation_is_deterministic_when_sigma_is_zero() -> None:
     np.testing.assert_allclose(simulated, expected)
 
 
+def test_simulation_stores_start_of_quarter_values() -> None:
+    inputs = SimulationInputs(
+        withdrawal=0.0,
+        mu=0.0,
+        sigma=0.0,
+        initial_balance=25_000.0,
+        quarters=4,
+        simulations=1,
+        seed=7,
+    )
+    simulated = simulate_balances(inputs)
+    expected = np.array([[25_000.0, 25_000.0, 25_000.0, 15_000.0, 15_000.0]])
+    np.testing.assert_allclose(simulated, expected)
+
+
 def test_payload_contains_twentile_rows_for_each_quarter() -> None:
     payload = simulation_payload(
         SimulationInputs(initial_balance=400_000.0, withdrawal=5_000.0, mu=0.01, sigma=0.02, simulations=100, seed=1)
@@ -69,7 +84,7 @@ def test_ideal_withdrawal_search_hits_target_in_simple_case() -> None:
         target_balance=100_000.0,
         step=100.0,
     )
-    assert result["recommended_withdrawal"] == 10_800.0
-    assert result["achieved_balance"] == 99_600.0
+    assert result["recommended_withdrawal"] == 10_000.0
+    assert result["achieved_balance"] == 100_000.0
     assert result["target_quarter"] == "Q4 2029"
-    assert result["target_timing"] == "beginning"
+    assert result["target_timing"] == "start"

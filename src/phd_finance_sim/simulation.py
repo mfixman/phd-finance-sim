@@ -106,15 +106,14 @@ def simulate_balances(inputs: SimulationInputs) -> np.ndarray:
     all_quarters = np.zeros((inputs.simulations, inputs.quarters + 1), dtype=float)
     all_quarters[:, 0] = balances
 
-    for quarter_idx in range(inputs.quarters):
-        quarter_number = quarter_idx + 1
-        withdrawal = withdrawal_for_quarter(quarter_number, inputs.withdrawal)
-        balances = np.maximum(balances - withdrawal, 0.0)
+    for quarter_idx in range(1, inputs.quarters + 1):
         growth = rng.lognormal(mean=inputs.mu, sigma=inputs.sigma, size=inputs.simulations)
         if inputs.apply_taxes:
             growth = tax_adjusted_growth_factor(growth)
         balances = balances * growth
-        all_quarters[:, quarter_idx + 1] = balances
+        withdrawal = withdrawal_for_quarter(quarter_idx, inputs.withdrawal)
+        balances = np.maximum(balances - withdrawal, 0.0)
+        all_quarters[:, quarter_idx] = balances
 
     return all_quarters
 
@@ -129,7 +128,7 @@ def percentile_balance_at_index(inputs: SimulationInputs, percentile: int = 5, b
 
 
 def ideal_withdrawal_target_index(inputs: SimulationInputs) -> int:
-    return max(inputs.quarters - 1, 0)
+    return inputs.quarters
 
 
 def ideal_withdrawal_search(
@@ -151,7 +150,7 @@ def ideal_withdrawal_search(
             "target_balance": target_balance,
             "percentile": percentile,
             "target_quarter": target_quarter,
-            "target_timing": "beginning",
+            "target_timing": "start",
             "within_tolerance": abs(achieved - target_balance) <= step,
         }
 
@@ -199,7 +198,7 @@ def ideal_withdrawal_search(
             "target_balance": target_balance,
             "percentile": percentile,
             "target_quarter": target_quarter,
-            "target_timing": "beginning",
+            "target_timing": "start",
             "within_tolerance": False,
         }
 
@@ -257,7 +256,7 @@ def ideal_withdrawal_search(
         "target_balance": target_balance,
         "percentile": percentile,
         "target_quarter": target_quarter,
-        "target_timing": "beginning",
+        "target_timing": "start",
         "within_tolerance": abs(best_balance - target_balance) <= step,
     }
 
