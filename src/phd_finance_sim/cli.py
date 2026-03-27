@@ -11,6 +11,7 @@ from .simulation import SimulationInputs, simulation_payload
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the PhD finance simulation.")
     parser.add_argument("--initial-balance", type=float, default=DEFAULT_INITIAL_BALANCE)
+    parser.add_argument("--apply-taxes", action="store_true")
     parser.add_argument("--withdrawal", type=float, default=DEFAULT_WITHDRAWAL)
     parser.add_argument("--mu", type=float, default=DEFAULT_MU)
     parser.add_argument("--sigma", type=float, default=DEFAULT_SIGMA)
@@ -32,7 +33,7 @@ def main() -> None:
 
     if args.history_start_quarter:
         history = load_history_frame()
-        stats = history_stats_from(history, args.history_start_quarter)
+        stats = history_stats_from(history, args.history_start_quarter, apply_taxes=args.apply_taxes)
         mu = stats.mu
         sigma = stats.sigma
         history_meta = stats.__dict__
@@ -40,6 +41,7 @@ def main() -> None:
     payload = simulation_payload(
         SimulationInputs(
             initial_balance=args.initial_balance,
+            apply_taxes=args.apply_taxes,
             withdrawal=args.withdrawal,
             mu=mu,
             sigma=sigma,

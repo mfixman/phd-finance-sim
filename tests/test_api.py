@@ -29,3 +29,25 @@ def test_simulate_endpoint_returns_chart_and_twentiles() -> None:
     assert payload["chart_percentiles"][3]["values"][0] == 400000.0
     assert len(payload["chart_percentiles"]) == 7
     assert len(payload["twentiles"]) == 20
+
+
+def test_simulate_endpoint_applies_taxes_to_initial_balance() -> None:
+    response = client.post(
+        "/api/simulate",
+        json={"initial_balance": 400000, "apply_taxes": True, "withdrawal": 10000, "mu": 0.02, "sigma": 0.08, "simulations": 500, "seed": 42},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["effective_initial_balance"] == 385710.0
+    assert payload["chart_percentiles"][3]["values"][0] == 385710.0
+
+
+def test_ideal_withdrawal_endpoint_returns_recommendation() -> None:
+    response = client.post(
+        "/api/ideal-withdrawal",
+        json={"initial_balance": 220000, "mu": 0.0, "sigma": 0.0, "simulations": 100, "seed": 1},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["recommended_withdrawal"] == 10000.0
+    assert payload["achieved_balance"] == 100000.0

@@ -8,26 +8,48 @@ const percentFormatter = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 2,
 });
 
+const currencyFormatter = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  maximumFractionDigits: 0,
+});
+
 let historyRecords = [];
+let historyEndQuarter = "";
+
+function taxesEnabled() {
+  return document.getElementById("applyTaxes").checked;
+}
 
 function formatTableValue(value) {
   const truncatedThousands = Math.trunc(value / 1000);
   return `${truncatedThousands}k`;
 }
 
-function updateEffectiveStats() {
-  const mu = Number(document.getElementById("mu").value);
-  const sigma = Number(document.getElementById("sigma").value);
-  const yearlyMu = 4 * mu;
-  const yearlySigma = 2 * sigma;
-  const growthMean = Math.exp(yearlyMu + (yearlySigma ** 2) / 2);
-  const growthVariance = (Math.exp(yearlySigma ** 2) - 1) * Math.exp(2 * yearlyMu + yearlySigma ** 2);
-  const returnMean = growthMean - 1;
-  const returnStd = Math.sqrt(growthVariance);
+function clearIdealWithdrawalResult() {
+  document.getElementById("idealWithdrawalResult").textContent = "";
+}
 
-  document.getElementById("effectiveStats").textContent =
-    `Implied yearly return distribution from the selected quarterly log parameters: ` +
-    `mean ${percentFormatter.format(returnMean * 100)}%, std ${percentFormatter.format(returnStd * 100)}%.`;
+function updateEffectiveStats() {
+  const payload = {
+    initial_balance: Number(document.getElementById("initialBalance").value),
+    apply_taxes: taxesEnabled(),
+    mu: Number(document.getElementById("mu").value),
+    sigma: Number(document.getElementById("sigma").value),
+  };
+
+  return fetchJson("/api/effective-stats", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then((result) => {
+    document.getElementById("effectiveStats").textContent =
+      `Effective starting balance ${currencyFormatter.format(result.effective_initial_balance)}. ` +
+      `Implied yearly return distribution from the selected quarterly log parameters: ` +
+      `mean ${percentFormatter.format(result.yearly_mean * 100)}%, std ${percentFormatter.format(
+        result.yearly_std * 100
+      )}%.`;
+  });
 }
 
 async function fetchJson(url, options = {}) {
@@ -84,6 +106,17 @@ function renderHistoryChart(records, selectedQuarter, endQuarter) {
     },
     { responsive: true }
   );
+}
+
+async function loadHistoryData() {
+  const history = await fetchJson(`/api/history?apply_taxes=${taxesEnabled()}`);
+  historyRecords = history.records;
+  historyEndQuarter = history.end_quarter;
+  const currentSelection = document.getElementById("startQuarter").value;
+  buildHistoryOptions(history.quarters);
+  document.getElementById("startQuarter").value =
+    history.quarters.includes(currentSelection) && currentSelection ? currentSelection : history.default_stats.start_quarter;
+  return history;
 }
 
 function renderProjectionChart(series) {
@@ -148,25 +181,32 @@ function renderTwentileTable(rows, quarters) {
   }
 }
 
-async function applyHistoryStats() {
+async function applyHistoryStats(applyToInputs = true) {
   const startQuarter = document.getElementById("startQuarter").value;
-  const stats = await fetchJson(`/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}`);
-  document.getElementById("mu").value = stats.mu.toFixed(4);
-  document.getElementById("sigma").value = stats.sigma.toFixed(4);
+  const stats = await fetchJson(
+    `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=${taxesEnabled()}`
+  );
+  if (applyToInputs) {
+    document.getElementById("mu").value = stats.mu.toFixed(4);
+    document.getElementById("sigma").value = stats.sigma.toFixed(4);
+  }
   document.getElementById(
     "historyStats"
   ).textContent =
     `From ${stats.start_quarter} through ${stats.end_quarter} inclusive: ` +
-    `annualized total return ${percentFormatter.format(stats.annualized_return * 100)}% per year. ` +
+    `${stats.apply_taxes ? "post-tax " : ""}annualized total return ${percentFormatter.format(
+      stats.annualized_return * 100
+    )}% per year. ` +
     `Quarterly log mu ${numberFormatter.format(stats.mu)}, quarterly log sigma ${numberFormatter.format(stats.sigma)}, ` +
     `${stats.observations} quarterly observations.`;
-  updateEffectiveStats();
+  await updateEffectiveStats();
   renderHistoryChart(historyRecords, startQuarter, stats.end_quarter);
 }
 
 async function runSimulation() {
   const payload = {
     initial_balance: Number(document.getElementById("initialBalance").value),
+    apply_taxes: taxesEnabled(),
     withdrawal: Number(document.getElementById("withdrawal").value),
     mu: Number(document.getElementById("mu").value),
     sigma: Number(document.getElementById("sigma").value),
@@ -184,20 +224,68 @@ async function runSimulation() {
   renderTwentileTable(result.twentiles, result.quarters);
 }
 
+async function findIdealWithdrawal() {
+  const payload = {
+    initial_balance: Number(document.getElementById("initialBalance").value),
+    apply_taxes: taxesEnabled(),
+    mu: Number(document.getElementById("mu").value),
+    sigma: Number(document.getElementById("sigma").value),
+    simulations: Number(document.getElementById("simulations").value),
+    seed: Number(document.getElementById("seed").value),
+  };
+
+  const result = await fetchJson("/api/ideal-withdrawal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  document.getElementById("withdrawal").value = result.recommended_withdrawal.toFixed(0);
+  document.getElementById("idealWithdrawalResult").textContent =
+    `Ideal X for a 5th percentile of £100k at the start of Q4 2029: ` +
+    `${currencyFormatter.format(result.recommended_withdrawal)}. ` +
+    `Achieved 5th percentile: ${currencyFormatter.format(result.achieved_balance)}.`;
+  await runSimulation();
+}
+
+async function refreshTaxMode() {
+  clearIdealWithdrawalResult();
+  await loadHistoryData();
+  await applyHistoryStats(false);
+  await runSimulation();
+}
+
 async function init() {
-  const history = await fetchJson("/api/history");
-  historyRecords = history.records;
-  buildHistoryOptions(history.quarters);
-  document.getElementById("startQuarter").value = history.default_stats.start_quarter;
-  renderHistoryChart(history.records, history.default_stats.start_quarter, history.end_quarter);
+  const history = await loadHistoryData();
   await applyHistoryStats();
   await runSimulation();
 
-  document.getElementById("useHistory").addEventListener("click", applyHistoryStats);
+  document.getElementById("useHistory").addEventListener("click", () => {
+    clearIdealWithdrawalResult();
+    applyHistoryStats();
+  });
+  document.getElementById("idealWithdrawal").addEventListener("click", findIdealWithdrawal);
   document.getElementById("runSimulation").addEventListener("click", runSimulation);
-  document.getElementById("startQuarter").addEventListener("change", applyHistoryStats);
-  document.getElementById("mu").addEventListener("input", updateEffectiveStats);
-  document.getElementById("sigma").addEventListener("input", updateEffectiveStats);
+  document.getElementById("startQuarter").addEventListener("change", () => {
+    clearIdealWithdrawalResult();
+    applyHistoryStats();
+  });
+  document.getElementById("applyTaxes").addEventListener("change", refreshTaxMode);
+  document.getElementById("initialBalance").addEventListener("change", () => {
+    clearIdealWithdrawalResult();
+    updateEffectiveStats();
+  });
+  document.getElementById("mu").addEventListener("change", () => {
+    clearIdealWithdrawalResult();
+    updateEffectiveStats();
+  });
+  document.getElementById("sigma").addEventListener("change", () => {
+    clearIdealWithdrawalResult();
+    updateEffectiveStats();
+  });
+  document.getElementById("withdrawal").addEventListener("change", clearIdealWithdrawalResult);
+  document.getElementById("simulations").addEventListener("change", clearIdealWithdrawalResult);
+  document.getElementById("seed").addEventListener("change", clearIdealWithdrawalResult);
 }
 
 window.addEventListener("DOMContentLoaded", () => {

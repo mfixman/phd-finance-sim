@@ -4,6 +4,7 @@ import numpy as np
 
 from phd_finance_sim.simulation import (
     SimulationInputs,
+    ideal_withdrawal_search,
     simulate_balances,
     simulation_payload,
     withdrawal_schedule,
@@ -52,3 +53,21 @@ def test_payload_contains_twentile_rows_for_each_quarter() -> None:
     assert len(payload["twentiles"]) == 20
     assert payload["twentiles"][0]["percentile"] == 5
     assert len(payload["twentiles"][0]["values"]) == 13
+
+
+def test_tax_mode_reduces_effective_initial_balance() -> None:
+    payload = simulation_payload(
+        SimulationInputs(initial_balance=400_000.0, apply_taxes=True, withdrawal=0.0, mu=0.0, sigma=0.0, simulations=10)
+    )
+    assert payload["effective_initial_balance"] == 385710.0
+    assert payload["chart_percentiles"][3]["values"][0] == 385710.0
+
+
+def test_ideal_withdrawal_search_hits_target_in_simple_case() -> None:
+    result = ideal_withdrawal_search(
+        SimulationInputs(initial_balance=220_000.0, withdrawal=0.0, mu=0.0, sigma=0.0, simulations=10, seed=1),
+        target_balance=100_000.0,
+        step=100.0,
+    )
+    assert result["recommended_withdrawal"] == 10_000.0
+    assert result["achieved_balance"] == 100_000.0
