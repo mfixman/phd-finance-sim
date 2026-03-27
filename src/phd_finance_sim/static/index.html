@@ -14,13 +14,17 @@
         <p class="eyebrow">PhD Runway Planner</p>
         <h1>Quarterly withdrawals against an S&amp;P 500 balance.</h1>
         <p class="summary">
-          Starts from a fixed £303,200 balance, applies your withdrawal schedule, and simulates the remaining balance
-          with a lognormal quarterly growth model.
+          Starts from a fixed balance, applies your withdrawal schedule, and simulates the remaining balance with a
+          lognormal quarterly growth model.
         </p>
       </section>
 
       <section class="panel controls">
         <div class="field-grid">
+          <label>
+            <span>Initial value</span>
+            <input id="initialBalanceDisplay" type="text" value="£303,200" readonly />
+          </label>
           <label class="checkbox-field">
             <span>Taxes</span>
             <input id="applyTaxes" type="checkbox" />
@@ -63,10 +67,10 @@
           <p id="idealWithdrawalResult"></p>
           <p id="verificationStats"></p>
           <p>
-            Projection starts at Q4 2026 from a fixed £303,200 balance. Q1-Q2 2027 withdraw £0; from Q3 2027 through
-            Q4 2029 withdraw £X each quarter, with an extra £10k at Q3 2027 and Q3 2028. Turning taxes on subtracts
-            £14,290 from that starting balance and keeps 91% of each quarter's percentage return, including losing
-            quarters.
+            Projection starts at Q4 2026 from the initial value shown above. Q1-Q2 2027 withdraw £0; from Q3 2027
+            through Q4 2029 withdraw £X each quarter, with an extra £10k at Q3 2027 and Q3 2028. Turning taxes on
+            subtracts £14,290 from that starting balance for future tax on unrealised gains and keeps 91% of each
+            quarter's percentage return, including losing quarters.
           </p>
         </div>
       </section>

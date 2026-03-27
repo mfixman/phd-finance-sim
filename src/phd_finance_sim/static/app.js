@@ -32,6 +32,14 @@ function clearIdealWithdrawalResult() {
   document.getElementById("idealWithdrawalResult").textContent = "";
 }
 
+function updateInitialBalanceDisplay(effectiveInitialBalance, applyTaxes) {
+  const input = document.getElementById("initialBalanceDisplay");
+  input.value = currencyFormatter.format(effectiveInitialBalance);
+  input.title = applyTaxes
+    ? `Base £303,200 minus £14,290 tax adjustment on unrealised gains`
+    : `Base ${currencyFormatter.format(DEFAULT_INITIAL_BALANCE)}`;
+}
+
 function updateEffectiveStats() {
   const payload = {
     initial_balance: DEFAULT_INITIAL_BALANCE,
@@ -45,8 +53,8 @@ function updateEffectiveStats() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   }).then((result) => {
+    updateInitialBalanceDisplay(result.effective_initial_balance, result.apply_taxes);
     document.getElementById("effectiveStats").textContent =
-      `Starting balance ${currencyFormatter.format(DEFAULT_INITIAL_BALANCE)}. ` +
       `${result.apply_taxes ? "With taxes" : "Without taxes"} the effective starting balance is ${currencyFormatter.format(
         result.effective_initial_balance
       )}. ` +
@@ -272,6 +280,7 @@ async function refreshTaxMode() {
 
 async function init() {
   const history = await loadHistoryData();
+  updateInitialBalanceDisplay(DEFAULT_INITIAL_BALANCE, false);
   await applyHistoryStats();
   await runSimulation();
 
