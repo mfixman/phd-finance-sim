@@ -1,2 +1,0 @@
-[console_scripts]
-phd-finance-sim = phd_finance_sim.cli:main
