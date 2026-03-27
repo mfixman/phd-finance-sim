@@ -33,7 +33,7 @@ def main() -> None:
 
     if args.history_start_quarter:
         history = load_history_frame()
-        stats = history_stats_from(history, args.history_start_quarter, apply_taxes=args.apply_taxes)
+        stats = history_stats_from(history, args.history_start_quarter, apply_taxes=False)
         mu = stats.mu
         sigma = stats.sigma
         history_meta = stats.__dict__

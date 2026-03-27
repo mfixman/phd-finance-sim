@@ -33,6 +33,8 @@ def test_history_stats_apply_taxes_reduces_return_series() -> None:
     )
     untaxed = history_stats_from(frame, "2000Q2", apply_taxes=False)
     taxed = history_stats_from(frame, "2000Q2", apply_taxes=True)
-    assert taxed.annualized_return < untaxed.annualized_return
-    assert taxed.mu < untaxed.mu
+    expected_growth_factors = np.array([0.818, 1.273])
+    assert taxed.annualized_return == pytest.approx(np.prod(expected_growth_factors) ** 2 - 1.0)
+    assert taxed.mu == pytest.approx(np.log(expected_growth_factors).mean())
+    assert taxed.sigma < untaxed.sigma
     assert taxed.apply_taxes is True

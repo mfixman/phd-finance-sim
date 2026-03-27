@@ -109,7 +109,7 @@ function renderHistoryChart(records, selectedQuarter, endQuarter) {
 }
 
 async function loadHistoryData() {
-  const history = await fetchJson(`/api/history?apply_taxes=${taxesEnabled()}`);
+  const history = await fetchJson("/api/history?apply_taxes=false");
   historyRecords = history.records;
   historyEndQuarter = history.end_quarter;
   const currentSelection = document.getElementById("startQuarter").value;
@@ -183,15 +183,13 @@ function renderTwentileTable(rows, quarters) {
 
 async function applyHistoryStats(applyToInputs = true) {
   const startQuarter = document.getElementById("startQuarter").value;
-  const stats = await fetchJson(
-    `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=${taxesEnabled()}`
-  );
   const untaxedStats = await fetchJson(
     `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=false`
   );
   const taxedStats = await fetchJson(
     `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=true`
   );
+  const stats = untaxedStats;
   if (applyToInputs) {
     document.getElementById("mu").value = stats.mu.toFixed(4);
     document.getElementById("sigma").value = stats.sigma.toFixed(4);
@@ -200,11 +198,9 @@ async function applyHistoryStats(applyToInputs = true) {
     "historyStats"
   ).textContent =
     `From ${stats.start_quarter} through ${stats.end_quarter} inclusive: ` +
-    `${stats.apply_taxes ? "post-tax " : ""}annualized total return ${percentFormatter.format(
-      stats.annualized_return * 100
-    )}% per year. ` +
+    `pre-tax annualized total return ${percentFormatter.format(stats.annualized_return * 100)}% per year. ` +
     `Quarterly log mu ${numberFormatter.format(stats.mu)}, quarterly log sigma ${numberFormatter.format(stats.sigma)}, ` +
-    `${stats.observations} quarterly observations.`;
+    `${stats.observations} quarterly observations. These are the parameters used for simulation.`;
   document.getElementById("verificationStats").textContent =
     `Verification for ${startQuarter} to ${stats.end_quarter}: ` +
     `without taxes annualized growth ${percentFormatter.format(untaxedStats.annualized_return * 100)}% per year, ` +
@@ -213,7 +209,7 @@ async function applyHistoryStats(applyToInputs = true) {
     )}; with taxes annualized growth ${percentFormatter.format(taxedStats.annualized_return * 100)}% per year, ` +
     `quarterly log mu ${numberFormatter.format(taxedStats.mu)}, quarterly log sigma ${numberFormatter.format(
       taxedStats.sigma
-    )}. Sigma here is a standard deviation of log returns, so it is not a percent figure.`;
+    )}. Sigma here is a standard deviation of log returns, so it is not a percent figure. Tax mode is applied in the simulation, not fitted twice.`;
   await updateEffectiveStats();
   renderHistoryChart(historyRecords, startQuarter, stats.end_quarter);
 }
@@ -265,7 +261,6 @@ async function findIdealWithdrawal() {
 
 async function refreshTaxMode() {
   clearIdealWithdrawalResult();
-  await loadHistoryData();
   await applyHistoryStats(false);
   await runSimulation();
 }
