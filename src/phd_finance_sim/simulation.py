@@ -8,6 +8,8 @@ from .config import (
     DEFAULT_EXTRA_WITHDRAWALS,
     DEFAULT_INITIAL_BALANCE,
     DEFAULT_QUARTERS,
+    PROJECTION_START_QUARTER,
+    PROJECTION_START_YEAR,
     DEFAULT_SEED,
     DEFAULT_SIMULATIONS,
 )
@@ -38,10 +40,30 @@ def withdrawal_schedule(base_withdrawal: float, quarters: int = DEFAULT_QUARTERS
     return [withdrawal_for_quarter(quarter, base_withdrawal) for quarter in range(1, quarters + 1)]
 
 
+def projection_quarter_labels(
+    quarters: int,
+    start_year: int = PROJECTION_START_YEAR,
+    start_quarter: int = PROJECTION_START_QUARTER,
+) -> list[str]:
+    labels = []
+    year = start_year
+    quarter = start_quarter
+
+    for _ in range(quarters + 1):
+        labels.append(f"Q{quarter} {year}")
+        quarter += 1
+        if quarter == 5:
+            quarter = 1
+            year += 1
+
+    return labels
+
+
 def simulate_balances(inputs: SimulationInputs) -> np.ndarray:
     rng = np.random.default_rng(inputs.seed)
     balances = np.full(inputs.simulations, inputs.initial_balance, dtype=float)
-    all_quarters = np.zeros((inputs.simulations, inputs.quarters), dtype=float)
+    all_quarters = np.zeros((inputs.simulations, inputs.quarters + 1), dtype=float)
+    all_quarters[:, 0] = balances
 
     for quarter_idx in range(inputs.quarters):
         quarter_number = quarter_idx + 1
@@ -49,7 +71,7 @@ def simulate_balances(inputs: SimulationInputs) -> np.ndarray:
         balances = np.maximum(balances - withdrawal, 0.0)
         growth = rng.lognormal(mean=inputs.mu, sigma=inputs.sigma, size=inputs.simulations)
         balances = balances * growth
-        all_quarters[:, quarter_idx] = balances
+        all_quarters[:, quarter_idx + 1] = balances
 
     return all_quarters
 
@@ -62,7 +84,7 @@ def simulation_payload(inputs: SimulationInputs) -> dict[str, object]:
     simulated = simulate_balances(inputs)
     chart_values = percentile_table(simulated, CHART_PERCENTILES)
     twentile_values = percentile_table(simulated, TWENTILES)
-    quarters = [f"Q{quarter}" for quarter in range(1, inputs.quarters + 1)]
+    quarters = projection_quarter_labels(inputs.quarters)
 
     chart_series = []
     for index, percentile in enumerate(CHART_PERCENTILES):

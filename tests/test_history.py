@@ -10,10 +10,13 @@ def test_history_stats_from_selected_quarter() -> None:
     frame = pd.DataFrame(
         {
             "quarter": ["2000Q1", "2000Q2", "2000Q3"],
+            "growth_factor": [1.105170918, 0.818730753, 1.349858808],
             "log_gain": [0.1, -0.2, 0.3],
         }
     )
     stats = history_stats_from(frame, "2000Q2")
     assert stats.start_quarter == "2000Q2"
+    assert stats.end_quarter == "2000Q3"
     assert stats.observations == 2
     assert stats.mu == pytest.approx(0.05)
+    assert stats.annualized_return == pytest.approx(0.221402758, rel=1e-6)

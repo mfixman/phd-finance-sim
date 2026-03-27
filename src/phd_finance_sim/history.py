@@ -11,9 +11,21 @@ from .config import DATA_FILE
 @dataclass(frozen=True)
 class HistoryStats:
     start_quarter: str
+    end_quarter: str
     observations: int
     mu: float
     sigma: float
+    annualized_return: float
+    yearly_mean: float
+    yearly_std: float
+
+
+def annualized_mean_std_from_quarterly_log_params(mu: float, sigma: float) -> tuple[float, float]:
+    yearly_mu = 4 * mu
+    yearly_sigma = np.sqrt(4) * sigma
+    gross_mean = float(np.exp(yearly_mu + (yearly_sigma**2) / 2))
+    gross_variance = float((np.exp(yearly_sigma**2) - 1) * np.exp(2 * yearly_mu + yearly_sigma**2))
+    return gross_mean - 1.0, float(np.sqrt(gross_variance))
 
 
 def load_history_frame() -> pd.DataFrame:
@@ -51,17 +63,25 @@ def history_stats_from(frame: pd.DataFrame, start_quarter: str) -> HistoryStats:
     if len(matches) == 0:
         raise KeyError(f"Unknown starting quarter: {start_quarter}")
 
-    subset = frame.loc[matches[0] :, "log_gain"]
+    start_index = int(matches[0])
+    subset = frame.loc[start_index:, ["log_gain", "growth_factor"]]
     if subset.empty:
         raise ValueError(f"No observations available from starting quarter {start_quarter}")
 
-    mu = float(subset.mean())
-    sigma = float(subset.std(ddof=0))
+    mu = float(subset["log_gain"].mean())
+    sigma = float(subset["log_gain"].std(ddof=0))
+    end_quarter = str(frame.iloc[-1]["quarter"])
+    annualized_return = float(np.prod(subset["growth_factor"]) ** (4 / len(subset)) - 1.0)
+    yearly_mean, yearly_std = annualized_mean_std_from_quarterly_log_params(mu, sigma)
     return HistoryStats(
         start_quarter=start_quarter,
+        end_quarter=end_quarter,
         observations=int(len(subset)),
         mu=mu,
         sigma=sigma,
+        annualized_return=annualized_return,
+        yearly_mean=yearly_mean,
+        yearly_std=yearly_std,
     )
 
 
@@ -73,15 +93,20 @@ def default_history_stats(frame: pd.DataFrame | None = None) -> HistoryStats:
 def history_payload(frame: pd.DataFrame | None = None) -> dict[str, object]:
     history = load_history_frame() if frame is None else frame
     default_stats = default_history_stats(history)
+    stats_by_quarter = {quarter: history_stats_from(history, quarter) for quarter in history["quarter"]}
     records = history.assign(
         start_date=lambda df: df["start_date"].dt.strftime("%Y-%m-%d"),
         end_date=lambda df: df["end_date"].dt.strftime("%Y-%m-%d"),
+        annualized_return=lambda df: df["quarter"].map(
+            lambda quarter: stats_by_quarter[quarter].annualized_return
+        ),
     ).to_dict(orient="records")
 
     return {
         "quarters": history["quarter"].tolist(),
         "records": records,
         "default_stats": default_stats.__dict__,
+        "end_quarter": history.iloc[-1]["quarter"],
     }
 
 

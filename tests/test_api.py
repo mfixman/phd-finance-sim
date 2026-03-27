@@ -12,8 +12,9 @@ def test_history_endpoint_serves_full_range() -> None:
     response = client.get("/api/history")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["quarters"][0] == "1980Q1"
-    assert payload["quarters"][-1] == "2025Q3"
+    assert payload["quarters"][0] == "1988Q1"
+    assert payload["quarters"][-1] == "2025Q4"
+    assert payload["end_quarter"] == "2025Q4"
 
 
 def test_simulate_endpoint_returns_chart_and_twentiles() -> None:
@@ -23,5 +24,7 @@ def test_simulate_endpoint_returns_chart_and_twentiles() -> None:
     )
     assert response.status_code == 200
     payload = response.json()
+    assert payload["quarters"][0] == "Q4 2026"
+    assert payload["quarters"][-1] == "Q4 2029"
     assert len(payload["chart_percentiles"]) == 7
     assert len(payload["twentiles"]) == 20

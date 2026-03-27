@@ -17,7 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--history-start-quarter",
-        help="If provided, derive mu and sigma from quarterly S&P 500 log gains from this quarter onward.",
+        help="If provided, derive mu and sigma from quarterly S&P 500 total-return log gains from this quarter onward.",
     )
     return parser
 

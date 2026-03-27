@@ -8,19 +8,25 @@ import yfinance as yf
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_FILE = PROJECT_ROOT / "data" / "sp500_quarterly_returns.csv"
+TOTAL_RETURN_TICKER = "^SP500TR"
+
+
+def latest_completed_quarter_end() -> str:
+    current_date = pd.Timestamp.now(tz="UTC").tz_localize(None)
+    return current_date.to_period("Q").start_time.strftime("%Y-%m-%d")
 
 
 def fetch_quarterly_returns() -> pd.DataFrame:
     history = yf.download(
-        "^GSPC",
+        TOTAL_RETURN_TICKER,
         start="1980-01-01",
-        end="2025-10-01",
-        auto_adjust=True,
+        end=latest_completed_quarter_end(),
+        auto_adjust=False,
         progress=False,
         interval="1d",
     )
     if history.empty:
-        raise RuntimeError("No S&P 500 data returned from Yahoo Finance.")
+        raise RuntimeError("No S&P 500 total return data returned from Yahoo Finance.")
 
     if isinstance(history.columns, pd.MultiIndex):
         history.columns = history.columns.get_level_values(0)
@@ -41,6 +47,7 @@ def fetch_quarterly_returns() -> pd.DataFrame:
     quarterly["growth_factor"] = quarterly["end_close"] / quarterly["start_close"]
     quarterly["quarter_return"] = quarterly["growth_factor"] - 1.0
     quarterly["log_gain"] = np.log(quarterly["growth_factor"])
+    quarterly["source_ticker"] = TOTAL_RETURN_TICKER
     return quarterly
 
 

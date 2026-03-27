@@ -8,27 +8,7 @@ const percentFormatter = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 2,
 });
 
-const TABLE_START_YEAR = 2026;
-const TABLE_START_QUARTER = 4;
-
 let historyRecords = [];
-
-function buildDisplayQuarterLabels(length) {
-  const labels = [];
-  let year = TABLE_START_YEAR;
-  let quarter = TABLE_START_QUARTER;
-
-  for (let index = 0; index < length; index += 1) {
-    labels.push(`Q${quarter} ${year}`);
-    quarter += 1;
-    if (quarter === 5) {
-      quarter = 1;
-      year += 1;
-    }
-  }
-
-  return labels;
-}
 
 function formatTableValue(value) {
   const truncatedThousands = Math.trunc(value / 1000);
@@ -38,14 +18,16 @@ function formatTableValue(value) {
 function updateEffectiveStats() {
   const mu = Number(document.getElementById("mu").value);
   const sigma = Number(document.getElementById("sigma").value);
-  const growthMean = Math.exp(mu + (sigma ** 2) / 2);
-  const growthVariance = (Math.exp(sigma ** 2) - 1) * Math.exp(2 * mu + sigma ** 2);
+  const yearlyMu = 4 * mu;
+  const yearlySigma = 2 * sigma;
+  const growthMean = Math.exp(yearlyMu + (yearlySigma ** 2) / 2);
+  const growthVariance = (Math.exp(yearlySigma ** 2) - 1) * Math.exp(2 * yearlyMu + yearlySigma ** 2);
   const returnMean = growthMean - 1;
   const returnStd = Math.sqrt(growthVariance);
 
   document.getElementById("effectiveStats").textContent =
-    `Implied quarterly return distribution: mean ${percentFormatter.format(returnMean * 100)}%, ` +
-    `std ${percentFormatter.format(returnStd * 100)}%.`;
+    `Implied yearly return distribution from the selected quarterly log parameters: ` +
+    `mean ${percentFormatter.format(returnMean * 100)}%, std ${percentFormatter.format(returnStd * 100)}%.`;
 }
 
 async function fetchJson(url, options = {}) {
@@ -67,20 +49,29 @@ function buildHistoryOptions(quarters) {
   }
 }
 
-function renderHistoryChart(records, selectedQuarter) {
+function renderHistoryChart(records, selectedQuarter, endQuarter) {
   const quarters = records.map((record) => record.quarter);
-  const values = records.map((record) => record.quarter_return * 100);
-  const colors = records.map((record) => (record.quarter === selectedQuarter ? "#d95f02" : "#0f4c5c"));
+  const values = records.map((record) => record.annualized_return * 100);
+  const selectedRecord = records.find((record) => record.quarter === selectedQuarter);
 
   Plotly.newPlot(
     "historyChart",
     [
       {
-        type: "bar",
+        type: "scatter",
+        mode: "lines",
         x: quarters,
         y: values,
-        marker: { color: colors },
-        hovertemplate: "%{x}<br>%{y:.2f}%<extra></extra>",
+        line: { color: "#0f4c5c", width: 2.5 },
+        hovertemplate: `Start %{x}<br>Annualized total return to ${endQuarter}: %{y:.2f}%<extra></extra>`,
+      },
+      {
+        type: "scatter",
+        mode: "markers",
+        x: selectedRecord ? [selectedRecord.quarter] : [],
+        y: selectedRecord ? [selectedRecord.annualized_return * 100] : [],
+        marker: { color: "#d95f02", size: 11 },
+        hovertemplate: `Selected %{x}<br>Annualized total return to ${endQuarter}: %{y:.2f}%<extra></extra>`,
       },
     ],
     {
@@ -88,7 +79,8 @@ function renderHistoryChart(records, selectedQuarter) {
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
       xaxis: { tickangle: -45 },
-      yaxis: { title: "Quarter return (%)" },
+      yaxis: { title: "Annualized total return (% per year)" },
+      showlegend: false,
     },
     { responsive: true }
   );
@@ -127,7 +119,6 @@ function renderProjectionChart(series) {
 function renderTwentileTable(rows, quarters) {
   const thead = document.querySelector("#twentileTable thead");
   const tbody = document.querySelector("#twentileTable tbody");
-  const displayQuarters = buildDisplayQuarterLabels(quarters.length);
 
   thead.innerHTML = "";
   tbody.innerHTML = "";
@@ -136,7 +127,7 @@ function renderTwentileTable(rows, quarters) {
   const corner = document.createElement("th");
   corner.textContent = "Percentile";
   headRow.appendChild(corner);
-  for (const quarter of displayQuarters) {
+  for (const quarter of quarters) {
     const cell = document.createElement("th");
     cell.textContent = quarter;
     headRow.appendChild(cell);
@@ -164,11 +155,13 @@ async function applyHistoryStats() {
   document.getElementById("sigma").value = stats.sigma.toFixed(4);
   document.getElementById(
     "historyStats"
-  ).textContent = `From ${stats.start_quarter} onward: mu ${numberFormatter.format(stats.mu)}, sigma ${numberFormatter.format(
-    stats.sigma
-  )}, observations ${stats.observations}.`;
+  ).textContent =
+    `From ${stats.start_quarter} through ${stats.end_quarter} inclusive: ` +
+    `annualized total return ${percentFormatter.format(stats.annualized_return * 100)}% per year. ` +
+    `Quarterly log mu ${numberFormatter.format(stats.mu)}, quarterly log sigma ${numberFormatter.format(stats.sigma)}, ` +
+    `${stats.observations} quarterly observations.`;
   updateEffectiveStats();
-  renderHistoryChart(historyRecords, startQuarter);
+  renderHistoryChart(historyRecords, startQuarter, stats.end_quarter);
 }
 
 async function runSimulation() {
@@ -195,7 +188,7 @@ async function init() {
   historyRecords = history.records;
   buildHistoryOptions(history.quarters);
   document.getElementById("startQuarter").value = history.default_stats.start_quarter;
-  renderHistoryChart(history.records, history.default_stats.start_quarter);
+  renderHistoryChart(history.records, history.default_stats.start_quarter, history.end_quarter);
   await applyHistoryStats();
   await runSimulation();
 
