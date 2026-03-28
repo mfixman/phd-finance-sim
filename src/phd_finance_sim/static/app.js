@@ -372,8 +372,15 @@ async function resetInitialBalance() {
 
 async function init() {
   const history = await loadHistoryData();
-  updateInitialBalanceInput(DEFAULT_INITIAL_BALANCE, false);
   lastTaxMode = taxesEnabled();
+  const initialBalanceInput = document.getElementById("initialBalance");
+  const usingDefaultInitialValue =
+    initialBalanceInput.value === "" || initialBalanceInput.value === initialBalanceInput.defaultValue;
+  if (usingDefaultInitialValue) {
+    updateInitialBalanceInput(DEFAULT_INITIAL_BALANCE, lastTaxMode);
+  } else {
+    updateInitialBalanceInput(getBaseInitialBalance(lastTaxMode), lastTaxMode);
+  }
   await applyHistoryStats();
   await runSimulation();
 
