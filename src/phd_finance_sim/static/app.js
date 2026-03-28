@@ -15,12 +15,37 @@ const currencyFormatter = new Intl.NumberFormat("en-GB", {
 });
 
 const DEFAULT_INITIAL_BALANCE = 303200;
+const TAX_INITIAL_BALANCE_ADJUSTMENT = 14290;
 
 let historyRecords = [];
 let historyEndQuarter = "";
+let lastTaxMode = false;
 
 function taxesEnabled() {
   return document.getElementById("applyTaxes").checked;
+}
+
+function displayedInitialBalance(applyTaxes, baseInitialBalance) {
+  if (!applyTaxes) {
+    return baseInitialBalance;
+  }
+  return Math.max(baseInitialBalance - TAX_INITIAL_BALANCE_ADJUSTMENT, 0);
+}
+
+function getDisplayedInitialBalance() {
+  const parsed = Number(document.getElementById("initialBalance").value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return displayedInitialBalance(taxesEnabled(), DEFAULT_INITIAL_BALANCE);
+  }
+  return parsed;
+}
+
+function getBaseInitialBalance(applyTaxes = taxesEnabled()) {
+  const displayedBalance = getDisplayedInitialBalance();
+  if (!applyTaxes) {
+    return displayedBalance;
+  }
+  return displayedBalance + TAX_INITIAL_BALANCE_ADJUSTMENT;
 }
 
 function formatTableValue(value) {
@@ -77,17 +102,18 @@ function clearIdealWithdrawalResult() {
   document.getElementById("idealWithdrawalResult").textContent = "";
 }
 
-function updateInitialBalanceDisplay(effectiveInitialBalance, applyTaxes) {
-  const input = document.getElementById("initialBalanceDisplay");
-  input.value = currencyFormatter.format(effectiveInitialBalance);
+function updateInitialBalanceInput(baseInitialBalance, applyTaxes) {
+  const input = document.getElementById("initialBalance");
+  input.value = Math.round(displayedInitialBalance(applyTaxes, baseInitialBalance));
   input.title = applyTaxes
-    ? `Base £303,200 minus £14,290 tax adjustment on unrealised gains`
-    : `Base ${currencyFormatter.format(DEFAULT_INITIAL_BALANCE)}`;
+    ? `${currencyFormatter.format(baseInitialBalance)} minus £14,290 tax adjustment on unrealised gains`
+    : `${currencyFormatter.format(baseInitialBalance)} with no tax adjustment`;
 }
 
 function updateEffectiveStats() {
+  const initialBalance = getBaseInitialBalance();
   const payload = {
-    initial_balance: DEFAULT_INITIAL_BALANCE,
+    initial_balance: initialBalance,
     apply_taxes: taxesEnabled(),
     mu: Number(document.getElementById("mu").value),
     sigma: Number(document.getElementById("sigma").value),
@@ -98,8 +124,9 @@ function updateEffectiveStats() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   }).then((result) => {
-    updateInitialBalanceDisplay(result.effective_initial_balance, result.apply_taxes);
+    updateInitialBalanceInput(initialBalance, result.apply_taxes);
     document.getElementById("effectiveStats").textContent =
+      `Base starting balance ${currencyFormatter.format(initialBalance)}. ` +
       `${result.apply_taxes ? "With taxes" : "Without taxes"} the effective starting balance is ${currencyFormatter.format(
         result.effective_initial_balance
       )}. ` +
@@ -284,7 +311,7 @@ async function applyHistoryStats(applyToInputs = true) {
 
 async function runSimulation() {
   const payload = {
-    initial_balance: DEFAULT_INITIAL_BALANCE,
+    initial_balance: getBaseInitialBalance(),
     apply_taxes: taxesEnabled(),
     withdrawal: Number(document.getElementById("withdrawal").value),
     mu: Number(document.getElementById("mu").value),
@@ -305,7 +332,7 @@ async function runSimulation() {
 
 async function findIdealWithdrawal() {
   const payload = {
-    initial_balance: DEFAULT_INITIAL_BALANCE,
+    initial_balance: getBaseInitialBalance(),
     apply_taxes: taxesEnabled(),
     mu: Number(document.getElementById("mu").value),
     sigma: Number(document.getElementById("sigma").value),
@@ -328,17 +355,29 @@ async function findIdealWithdrawal() {
 }
 
 async function refreshTaxMode() {
+  const baseInitialBalance = getBaseInitialBalance(lastTaxMode);
+  lastTaxMode = taxesEnabled();
+  updateInitialBalanceInput(baseInitialBalance, lastTaxMode);
   clearIdealWithdrawalResult();
   await applyHistoryStats(false);
   await runSimulation();
 }
 
+async function resetInitialBalance() {
+  updateInitialBalanceInput(DEFAULT_INITIAL_BALANCE, taxesEnabled());
+  clearIdealWithdrawalResult();
+  await updateEffectiveStats();
+  await runSimulation();
+}
+
 async function init() {
   const history = await loadHistoryData();
-  updateInitialBalanceDisplay(DEFAULT_INITIAL_BALANCE, false);
+  updateInitialBalanceInput(DEFAULT_INITIAL_BALANCE, false);
+  lastTaxMode = taxesEnabled();
   await applyHistoryStats();
   await runSimulation();
 
+  document.getElementById("resetInitialBalance").addEventListener("click", resetInitialBalance);
   document.getElementById("useHistory").addEventListener("click", () => {
     clearIdealWithdrawalResult();
     applyHistoryStats();
@@ -357,6 +396,10 @@ async function init() {
   document.getElementById("sigma").addEventListener("change", () => {
     clearIdealWithdrawalResult();
     updateEffectiveStats();
+  });
+  document.getElementById("initialBalance").addEventListener("change", () => {
+    clearIdealWithdrawalResult();
+    updateEffectiveStats().then(runSimulation);
   });
   document.getElementById("withdrawal").addEventListener("change", clearIdealWithdrawalResult);
   document.getElementById("simulations").addEventListener("change", clearIdealWithdrawalResult);

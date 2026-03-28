@@ -23,7 +23,7 @@
         <div class="field-grid">
           <label>
             <span>Initial value</span>
-            <input id="initialBalanceDisplay" type="text" value="£303,200" readonly />
+            <input id="initialBalance" type="number" min="0" step="100" value="303200" />
           </label>
           <label class="checkbox-field">
             <span>Taxes</span>
@@ -56,6 +56,7 @@
         </div>
 
         <div class="actions">
+          <button id="resetInitialBalance" type="button">Reset initial value</button>
           <button id="useHistory" type="button">Use historical mu/sigma</button>
           <button id="idealWithdrawal" type="button">Find ideal X</button>
           <button id="runSimulation" type="button">Run simulation</button>
@@ -67,7 +68,7 @@
           <p id="idealWithdrawalResult"></p>
           <p id="verificationStats"></p>
           <p>
-            Projection starts at Q4 2025 from the initial value shown above. Q1-Q2 2026 withdraw £0; from Q3 2026
+            Projection starts at Q4 2025 from the initial value entered above. Q1-Q2 2026 withdraw £0; from Q3 2026
             through Q4 2029 withdraw £X each quarter, with an extra £10k at Q3 2026 and Q3 2027. Turning taxes on
             subtracts £14,290 from that starting balance for future tax on unrealised gains and keeps 91% of each
             quarter's percentage return, including losing quarters.
