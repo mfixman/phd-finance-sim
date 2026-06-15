@@ -49,7 +49,7 @@ class EffectiveStatsRequest(BaseModel):
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(Path(STATIC_DIR) / "index.html")
+    return FileResponse(Path(STATIC_DIR) / "index.html", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/history")
