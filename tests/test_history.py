@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from phd_finance_sim.history import history_stats_from
+from phd_finance_sim.history import available_start_quarters, history_payload, history_stats_from
 
 
 def test_history_stats_from_selected_quarter() -> None:
@@ -37,3 +37,25 @@ def test_history_stats_apply_taxes_keeps_return_series_unchanged() -> None:
     assert taxed.mu == pytest.approx(untaxed.mu)
     assert taxed.sigma == pytest.approx(untaxed.sigma)
     assert taxed.apply_taxes is True
+
+
+def test_history_stats_exclude_projection_start_quarter_return() -> None:
+    frame = pd.DataFrame(
+        {
+            "quarter": ["2025Q2", "2025Q3", "2025Q4"],
+            "start_date": pd.to_datetime(["2025-04-01", "2025-07-01", "2025-10-01"]),
+            "end_date": pd.to_datetime(["2025-06-30", "2025-09-30", "2025-12-31"]),
+            "growth_factor": [1.10, 1.20, 9.99],
+            "log_gain": [np.log(1.10), np.log(1.20), np.log(9.99)],
+        }
+    )
+
+    stats = history_stats_from(frame, "2025Q2")
+    payload = history_payload(frame)
+
+    assert available_start_quarters(frame) == ["2025Q2", "2025Q3"]
+    assert payload["quarters"] == ["2025Q2", "2025Q3"]
+    assert payload["end_quarter"] == "2025Q4"
+    assert stats.end_quarter == "2025Q4"
+    assert stats.observations == 2
+    assert stats.mu == pytest.approx(np.mean([np.log(1.10), np.log(1.20)]))

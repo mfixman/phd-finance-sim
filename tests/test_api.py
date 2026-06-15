@@ -13,7 +13,8 @@ def test_history_endpoint_serves_full_range() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["quarters"][0] == "1988Q1"
-    assert payload["quarters"][-1] == "2025Q4"
+    assert payload["quarters"][-1] == "2025Q3"
+    assert "2025Q4" not in payload["quarters"]
     assert payload["end_quarter"] == "2025Q4"
 
 
