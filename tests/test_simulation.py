@@ -15,11 +15,11 @@ from phd_finance_sim.simulation import (
 def test_withdrawal_schedule_has_expected_extras() -> None:
     schedule = withdrawal_schedule(10_000.0)
     assert schedule[0] == 0.0
-    assert schedule[1] == 0.0
-    assert schedule[2] == 0.0
-    assert schedule[3] == 20_000.0
-    assert schedule[7] == 20_000.0
-    assert schedule[4] == 10_000.0
+    assert schedule[1] == 10_000.0
+    assert schedule[2] == 20_356.0
+    assert schedule[3] == 10_000.0
+    assert schedule[6] == 20_356.0
+    assert schedule[7] == 10_000.0
 
 
 def test_simulation_is_deterministic_when_sigma_is_zero() -> None:
@@ -35,9 +35,9 @@ def test_simulation_is_deterministic_when_sigma_is_zero() -> None:
     simulated = simulate_balances(inputs)
     expected = np.array(
         [
-            [100.0, 100.0, 100.0, 100.0, 0.0],
-            [100.0, 100.0, 100.0, 100.0, 0.0],
-            [100.0, 100.0, 100.0, 100.0, 0.0],
+            [100.0, 100.0, 0.0, 0.0, 0.0],
+            [100.0, 100.0, 0.0, 0.0, 0.0],
+            [100.0, 100.0, 0.0, 0.0, 0.0],
         ]
     )
     np.testing.assert_allclose(simulated, expected)
@@ -54,7 +54,7 @@ def test_simulation_stores_start_of_quarter_values() -> None:
         seed=7,
     )
     simulated = simulate_balances(inputs)
-    expected = np.array([[25_000.0, 25_000.0, 25_000.0, 25_000.0, 15_000.0]])
+    expected = np.array([[25_000.0, 25_000.0, 25_000.0, 14_644.0, 14_644.0]])
     np.testing.assert_allclose(simulated, expected)
 
 
@@ -129,7 +129,7 @@ def test_ideal_withdrawal_search_hits_target_in_simple_case() -> None:
         target_balance=100_000.0,
         step=100.0,
     )
-    assert result["recommended_withdrawal"] == 10_800.0
-    assert result["achieved_balance"] == 99_600.0
+    assert result["recommended_withdrawal"] == 9_300.0
+    assert result["achieved_balance"] == 99_788.0
     assert result["target_quarter"] == "Q4 2029"
     assert result["target_timing"] == "start"

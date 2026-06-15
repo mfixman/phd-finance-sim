@@ -33,7 +33,7 @@ class SimulationInputs:
 
 
 def withdrawal_for_quarter(quarter_number: int, base_withdrawal: float) -> float:
-    if quarter_number < 3:
+    if quarter_number < 1:
         return 0.0
 
     return base_withdrawal + DEFAULT_EXTRA_WITHDRAWALS.get(quarter_number, 0.0)
@@ -98,9 +98,9 @@ def simulate_balances(inputs: SimulationInputs) -> np.ndarray:
     all_quarters = np.zeros((inputs.simulations, inputs.quarters + 1), dtype=float)
     all_quarters[:, 0] = balances
 
-    # Store true start-of-quarter balances. Each step advances from one
-    # quarter's opening balance to the next after that quarter's return and
-    # scheduled withdrawal have been applied.
+    # Store start-of-quarter balances after opening cashflows. Each step
+    # advances to the next labelled quarter after the prior period's return and
+    # the next quarter's opening withdrawals have been applied.
     for quarter_idx in range(inputs.quarters):
         growth = rng.lognormal(mean=inputs.mu, sigma=inputs.sigma, size=inputs.simulations)
         balances = balances * growth

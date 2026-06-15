@@ -48,7 +48,7 @@ function formatTableValue(value) {
 function tableHighlightTargets(applyTaxes) {
   return {
     "Q1 2026": applyTaxes ? 305000 : 308000,
-    "Q2 2026": applyTaxes ? 293751 : 297251,
+    "Q2 2026": applyTaxes ? 283751 : 287251,
   };
 }
 
