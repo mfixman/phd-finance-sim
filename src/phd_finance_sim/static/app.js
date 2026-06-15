@@ -15,7 +15,6 @@ const currencyFormatter = new Intl.NumberFormat("en-GB", {
 });
 
 const DEFAULT_INITIAL_BALANCE = 303200;
-const TAX_INITIAL_BALANCE_ADJUSTMENT = 14290;
 
 let historyRecords = [];
 let historyEndQuarter = "";
@@ -26,10 +25,7 @@ function taxesEnabled() {
 }
 
 function displayedInitialBalance(applyTaxes, baseInitialBalance) {
-  if (!applyTaxes) {
-    return baseInitialBalance;
-  }
-  return Math.max(baseInitialBalance - TAX_INITIAL_BALANCE_ADJUSTMENT, 0);
+  return baseInitialBalance;
 }
 
 function getDisplayedInitialBalance() {
@@ -41,11 +37,7 @@ function getDisplayedInitialBalance() {
 }
 
 function getBaseInitialBalance(applyTaxes = taxesEnabled()) {
-  const displayedBalance = getDisplayedInitialBalance();
-  if (!applyTaxes) {
-    return displayedBalance;
-  }
-  return displayedBalance + TAX_INITIAL_BALANCE_ADJUSTMENT;
+  return getDisplayedInitialBalance();
 }
 
 function formatTableValue(value) {
@@ -55,8 +47,8 @@ function formatTableValue(value) {
 
 function tableHighlightTargets(applyTaxes) {
   return {
-    "Q1 2026": applyTaxes ? 296000 : 308000,
-    "Q2 2026": applyTaxes ? 279000 : 288000,
+    "Q1 2026": applyTaxes ? 305000 : 308000,
+    "Q2 2026": applyTaxes ? 293751 : 297251,
   };
 }
 
@@ -106,7 +98,7 @@ function updateInitialBalanceInput(baseInitialBalance, applyTaxes) {
   const input = document.getElementById("initialBalance");
   input.value = Math.round(displayedInitialBalance(applyTaxes, baseInitialBalance));
   input.title = applyTaxes
-    ? `${currencyFormatter.format(baseInitialBalance)} minus £14,290 tax adjustment on unrealised gains`
+    ? `${currencyFormatter.format(baseInitialBalance)} with £3,500 tax withdrawals before each Q1`
     : `${currencyFormatter.format(baseInitialBalance)} with no tax adjustment`;
 }
 
@@ -281,9 +273,6 @@ async function applyHistoryStats(applyToInputs = true) {
   const untaxedStats = await fetchJson(
     `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=false`
   );
-  const taxedStats = await fetchJson(
-    `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=true`
-  );
   const stats = untaxedStats;
   if (applyToInputs) {
     document.getElementById("mu").value = stats.mu.toFixed(4);
@@ -298,13 +287,10 @@ async function applyHistoryStats(applyToInputs = true) {
     `${stats.observations} quarterly observations. These are the parameters used for simulation.`;
   document.getElementById("verificationStats").textContent =
     `Verification for ${startQuarter} to ${stats.end_quarter}: ` +
-    `without taxes annualized growth ${percentFormatter.format(untaxedStats.annualized_return * 100)}% per year, ` +
+    `annualized growth ${percentFormatter.format(untaxedStats.annualized_return * 100)}% per year, ` +
     `quarterly log mu ${numberFormatter.format(untaxedStats.mu)}, quarterly log sigma ${numberFormatter.format(
       untaxedStats.sigma
-    )}; with taxes annualized growth ${percentFormatter.format(taxedStats.annualized_return * 100)}% per year, ` +
-    `quarterly log mu ${numberFormatter.format(taxedStats.mu)}, quarterly log sigma ${numberFormatter.format(
-      taxedStats.sigma
-    )}. Sigma here is a standard deviation of log returns, so it is not a percent figure. Tax mode is applied in the simulation, not fitted twice.`;
+    )}. Sigma here is a standard deviation of log returns, so it is not a percent figure. Tax mode uses the same return parameters and applies fixed Q1 cash withdrawals during the simulation.`;
   await updateEffectiveStats();
   renderHistoryChart(historyRecords, startQuarter, stats.end_quarter);
 }

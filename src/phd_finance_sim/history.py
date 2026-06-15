@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from .config import DATA_FILE
-from .simulation import tax_adjusted_growth_factor, yearly_return_stats_from_quarterly_log_params
+from .simulation import yearly_return_stats_from_quarterly_log_params
 
 
 @dataclass(frozen=True)
@@ -59,8 +59,6 @@ def history_stats_from(frame: pd.DataFrame, start_quarter: str, apply_taxes: boo
 
     start_index = int(matches[0])
     growth_factors = frame.loc[start_index:, "growth_factor"].to_numpy(dtype=float)
-    if apply_taxes:
-        growth_factors = tax_adjusted_growth_factor(growth_factors)
 
     subset = pd.DataFrame(
         {

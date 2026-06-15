@@ -31,15 +31,16 @@ def test_simulate_endpoint_returns_chart_and_twentiles() -> None:
     assert len(payload["twentiles"]) == 20
 
 
-def test_simulate_endpoint_applies_taxes_to_initial_balance() -> None:
+def test_simulate_endpoint_applies_q1_tax_withdrawal() -> None:
     response = client.post(
         "/api/simulate",
-        json={"initial_balance": 400000, "apply_taxes": True, "withdrawal": 10000, "mu": 0.02, "sigma": 0.08, "simulations": 500, "seed": 42},
+        json={"initial_balance": 400000, "apply_taxes": True, "withdrawal": 10000, "mu": 0.0, "sigma": 0.0, "simulations": 500, "seed": 42},
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["effective_initial_balance"] == 385710.0
-    assert payload["chart_percentiles"][3]["values"][0] == 385710.0
+    assert payload["effective_initial_balance"] == 400_000.0
+    assert payload["chart_percentiles"][3]["values"][0] == 400_000.0
+    assert payload["chart_percentiles"][3]["values"][1] == 396_500.0
 
 
 def test_ideal_withdrawal_endpoint_returns_recommendation() -> None:
@@ -49,7 +50,7 @@ def test_ideal_withdrawal_endpoint_returns_recommendation() -> None:
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["recommended_withdrawal"] == 10000.0
-    assert payload["achieved_balance"] == 100000.0
+    assert payload["recommended_withdrawal"] == 10800.0
+    assert payload["achieved_balance"] == 99600.0
     assert payload["target_quarter"] == "Q4 2029"
     assert payload["target_timing"] == "start"

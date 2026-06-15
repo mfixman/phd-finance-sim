@@ -23,7 +23,7 @@ def test_history_stats_from_selected_quarter() -> None:
     assert stats.annualized_return == pytest.approx(0.221402758, rel=1e-6)
 
 
-def test_history_stats_apply_taxes_reduces_return_series() -> None:
+def test_history_stats_apply_taxes_keeps_return_series_unchanged() -> None:
     frame = pd.DataFrame(
         {
             "quarter": ["2000Q1", "2000Q2", "2000Q3"],
@@ -33,8 +33,7 @@ def test_history_stats_apply_taxes_reduces_return_series() -> None:
     )
     untaxed = history_stats_from(frame, "2000Q2", apply_taxes=False)
     taxed = history_stats_from(frame, "2000Q2", apply_taxes=True)
-    expected_growth_factors = np.array([0.818, 1.273])
-    assert taxed.annualized_return == pytest.approx(np.prod(expected_growth_factors) ** 2 - 1.0)
-    assert taxed.mu == pytest.approx(np.log(expected_growth_factors).mean())
-    assert taxed.sigma < untaxed.sigma
+    assert taxed.annualized_return == pytest.approx(untaxed.annualized_return)
+    assert taxed.mu == pytest.approx(untaxed.mu)
+    assert taxed.sigma == pytest.approx(untaxed.sigma)
     assert taxed.apply_taxes is True

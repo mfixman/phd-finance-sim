@@ -12,12 +12,12 @@ from .config import (
     PROJECTION_START_YEAR,
     DEFAULT_SEED,
     DEFAULT_SIMULATIONS,
-    TAX_GAIN_MULTIPLIER,
-    TAX_INITIAL_BALANCE_ADJUSTMENT,
+    TAX_Q1_WITHDRAWAL,
 )
 
 CHART_PERCENTILES = [95, 90, 75, 50, 25, 10, 5]
 TWENTILES = list(range(5, 101, 5))
+TAX_Q1_WITHDRAWAL_QUARTERS = frozenset(range(0, DEFAULT_QUARTERS, 4))
 
 
 @dataclass(frozen=True)
@@ -40,7 +40,7 @@ def withdrawal_for_quarter(quarter_number: int, base_withdrawal: float) -> float
 
 
 def withdrawal_schedule(base_withdrawal: float, quarters: int = DEFAULT_QUARTERS) -> list[float]:
-    return [withdrawal_for_quarter(quarter, base_withdrawal) for quarter in range(1, quarters + 1)]
+    return [withdrawal_for_quarter(quarter, base_withdrawal) for quarter in range(quarters)]
 
 
 def projection_quarter_labels(
@@ -62,29 +62,21 @@ def projection_quarter_labels(
     return labels
 
 
-def tax_adjusted_growth_factor(growth_factor: np.ndarray | float) -> np.ndarray | float:
-    adjusted = 1.0 + (np.asarray(growth_factor) - 1.0) * TAX_GAIN_MULTIPLIER
-    if np.isscalar(growth_factor):
-        return float(adjusted)
-    return adjusted
+def tax_withdrawal_for_quarter(quarter_number: int, apply_taxes: bool) -> float:
+    if not apply_taxes:
+        return 0.0
+
+    return TAX_Q1_WITHDRAWAL if quarter_number in TAX_Q1_WITHDRAWAL_QUARTERS else 0.0
 
 
 def effective_initial_balance(initial_balance: float, apply_taxes: bool) -> float:
-    if not apply_taxes:
-        return initial_balance
-    return max(initial_balance - TAX_INITIAL_BALANCE_ADJUSTMENT, 0.0)
+    return initial_balance
 
 
 def quarterly_growth_moments(mu: float, sigma: float, apply_taxes: bool) -> tuple[float, float]:
     gross_mean = float(np.exp(mu + (sigma**2) / 2))
     gross_variance = float((np.exp(sigma**2) - 1) * np.exp(2 * mu + sigma**2))
-
-    if not apply_taxes:
-        return gross_mean, gross_variance
-
-    net_mean = 1.0 + (gross_mean - 1.0) * TAX_GAIN_MULTIPLIER
-    net_variance = (TAX_GAIN_MULTIPLIER**2) * gross_variance
-    return float(net_mean), float(net_variance)
+    return gross_mean, gross_variance
 
 
 def yearly_return_stats_from_quarterly_log_params(mu: float, sigma: float, apply_taxes: bool) -> tuple[float, float]:
@@ -106,14 +98,16 @@ def simulate_balances(inputs: SimulationInputs) -> np.ndarray:
     all_quarters = np.zeros((inputs.simulations, inputs.quarters + 1), dtype=float)
     all_quarters[:, 0] = balances
 
-    for quarter_idx in range(1, inputs.quarters + 1):
+    # Store true start-of-quarter balances. Each step advances from one
+    # quarter's opening balance to the next after that quarter's return and
+    # scheduled withdrawal have been applied.
+    for quarter_idx in range(inputs.quarters):
         growth = rng.lognormal(mean=inputs.mu, sigma=inputs.sigma, size=inputs.simulations)
-        if inputs.apply_taxes:
-            growth = tax_adjusted_growth_factor(growth)
         balances = balances * growth
         withdrawal = withdrawal_for_quarter(quarter_idx, inputs.withdrawal)
+        withdrawal += tax_withdrawal_for_quarter(quarter_idx, inputs.apply_taxes)
         balances = np.maximum(balances - withdrawal, 0.0)
-        all_quarters[:, quarter_idx] = balances
+        all_quarters[:, quarter_idx + 1] = balances
 
     return all_quarters
 
