@@ -17,7 +17,7 @@ const currencyFormatter = new Intl.NumberFormat("en-GB", {
 const STORAGE_KEY = "unemployment-withdrawal-simulator-values";
 
 const DEFAULT_CONFIG = {
-  initial_balance: 100000,
+  initial_balance: 500000,
   start_year: 2025,
   start_quarter: 4,
   end_year: 2029,
@@ -35,7 +35,7 @@ const DEFAULT_CONFIG = {
   withdrawal_rules: [],
   goal_year: 2029,
   goal_quarter: 4,
-  goal_balance: 100000,
+  goal_balance: 500000,
   goal_percentile: 5,
   mu: 0.02,
   sigma: 0.08,
