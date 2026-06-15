@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This repository contains a small finance-planning tool for modeling withdrawals during a non-working PhD period.
+This repository contains a small finance-planning tool for modeling portfolio withdrawals over configurable quarters.
 
 Follow these repo-specific rules in addition to `/home/mfixman/AGENTS.md`:
 

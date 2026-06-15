@@ -21,7 +21,6 @@ class HistoryStats:
     annualized_return: float
     yearly_mean: float
     yearly_std: float
-    apply_taxes: bool
 
 
 def load_history_frame() -> pd.DataFrame:
@@ -67,7 +66,7 @@ def historical_return_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     return analysis_history, HISTORY_ENDPOINT_QUARTER
 
 
-def history_stats_from(frame: pd.DataFrame, start_quarter: str, apply_taxes: bool = False) -> HistoryStats:
+def history_stats_from(frame: pd.DataFrame, start_quarter: str) -> HistoryStats:
     analysis_history, end_quarter = historical_return_frame(frame)
     matches = analysis_history.index[analysis_history["quarter"] == start_quarter]
     if len(matches) == 0:
@@ -88,7 +87,7 @@ def history_stats_from(frame: pd.DataFrame, start_quarter: str, apply_taxes: boo
     mu = float(subset["log_gain"].mean())
     sigma = float(subset["log_gain"].std(ddof=0))
     annualized_return = float(np.prod(subset["growth_factor"]) ** (4 / len(subset)) - 1.0)
-    yearly_mean, yearly_std = yearly_return_stats_from_quarterly_log_params(mu, sigma, apply_taxes)
+    yearly_mean, yearly_std = yearly_return_stats_from_quarterly_log_params(mu, sigma)
     return HistoryStats(
         start_quarter=start_quarter,
         end_quarter=end_quarter,
@@ -98,22 +97,21 @@ def history_stats_from(frame: pd.DataFrame, start_quarter: str, apply_taxes: boo
         annualized_return=annualized_return,
         yearly_mean=yearly_mean,
         yearly_std=yearly_std,
-        apply_taxes=apply_taxes,
     )
 
 
-def default_history_stats(frame: pd.DataFrame | None = None, apply_taxes: bool = False) -> HistoryStats:
+def default_history_stats(frame: pd.DataFrame | None = None) -> HistoryStats:
     history = load_history_frame() if frame is None else frame
     analysis_history, _ = historical_return_frame(history)
-    return history_stats_from(history, analysis_history.iloc[0]["quarter"], apply_taxes=apply_taxes)
+    return history_stats_from(history, analysis_history.iloc[0]["quarter"])
 
 
-def history_payload(frame: pd.DataFrame | None = None, apply_taxes: bool = False) -> dict[str, object]:
+def history_payload(frame: pd.DataFrame | None = None) -> dict[str, object]:
     history = load_history_frame() if frame is None else frame
     analysis_history, end_quarter = historical_return_frame(history)
-    default_stats = default_history_stats(history, apply_taxes=apply_taxes)
+    default_stats = default_history_stats(history)
     stats_by_quarter = {
-        quarter: history_stats_from(history, quarter, apply_taxes=apply_taxes) for quarter in analysis_history["quarter"]
+        quarter: history_stats_from(history, quarter) for quarter in analysis_history["quarter"]
     }
     records = analysis_history.assign(
         start_date=lambda df: df["start_date"].dt.strftime("%Y-%m-%d"),
@@ -128,7 +126,6 @@ def history_payload(frame: pd.DataFrame | None = None, apply_taxes: bool = False
         "records": records,
         "default_stats": default_stats.__dict__,
         "end_quarter": end_quarter,
-        "apply_taxes": apply_taxes,
     }
 
 

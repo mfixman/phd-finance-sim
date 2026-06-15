@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "phd-finance-sim"
 version = "0.1.0"
-description = "Quarterly withdrawal simulator for a PhD non-work period."
+description = "Quarterly unemployment withdrawal simulator."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

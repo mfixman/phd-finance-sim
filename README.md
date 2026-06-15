@@ -1,20 +1,16 @@
-# PhD Finance Simulator
+# Unemployment Withdrawal Simulator
 
-Small planning app for modeling quarterly withdrawals from an S&P 500 investment during a non-working PhD period.
-
-Assumption:
-
-- The request refers to S&P 500 "revenue". This app interprets that as quarterly market gain/return derived from adjusted index closes.
+Small planning app for modeling portfolio balances during an unemployment or non-working period.
 
 Features:
 
-- Quarterly withdrawal schedule over Q1 to Q16
-- Extra withdrawals at Q3 and Q7
+- Configurable initial value, projection start quarter, and projection end quarter
+- Arbitrary withdrawal rules with one-off, quarterly, or annual cadence
+- Configurable goal defined by quarter, percentile, and target balance
 - Monte Carlo simulation using lognormal quarterly growth
-- Historical S&P 500 quarterly return series from 1980Q1 through 2025Q3
-- Start-quarter picker that derives `mu` and `sigma` from historical log gains
-- Percentile chart for 5th, 10th, 25th, 50th, 75th, 90th, and 95th percentiles
-- 20 x 16 twentile table
+- Historical S&P 500 quarterly return series for deriving `mu` and `sigma`
+- Browser import/export for `values.json`
+- Percentile chart and twentile table
 - CLI and browser UI powered by the same backend code
 
 ## Setup

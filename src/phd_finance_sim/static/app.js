@@ -14,116 +14,308 @@ const currencyFormatter = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
-const DEFAULT_INITIAL_BALANCE = 303200;
+const STORAGE_KEY = "unemployment-withdrawal-simulator-values";
+
+const DEFAULT_CONFIG = {
+  initial_balance: 100000,
+  start_year: 2025,
+  start_quarter: 4,
+  end_year: 2029,
+  end_quarter: 4,
+  primary_withdrawal: {
+    name: "Primary quarterly withdrawal",
+    amount: 0,
+    start_year: 2025,
+    start_quarter: 4,
+    end_year: 2029,
+    end_quarter: 4,
+    cadence: "quarterly",
+    special: "primary_quarterly",
+  },
+  withdrawal_rules: [],
+  goal_year: 2029,
+  goal_quarter: 4,
+  goal_balance: 100000,
+  goal_percentile: 5,
+  mu: 0.02,
+  sigma: 0.08,
+  simulations: 40000,
+  seed: 42,
+  history_start_quarter: "",
+};
 
 let historyRecords = [];
-let historyEndQuarter = "";
-let lastTaxMode = false;
+let currentConfig = structuredClone(DEFAULT_CONFIG);
 
-function taxesEnabled() {
-  return document.getElementById("applyTaxes").checked;
-}
-
-function displayedInitialBalance(applyTaxes, baseInitialBalance) {
-  return baseInitialBalance;
-}
-
-function getDisplayedInitialBalance() {
-  const parsed = Number(document.getElementById("initialBalance").value);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return displayedInitialBalance(taxesEnabled(), DEFAULT_INITIAL_BALANCE);
-  }
-  return parsed;
-}
-
-function getBaseInitialBalance(applyTaxes = taxesEnabled()) {
-  return getDisplayedInitialBalance();
+function quarterLabel(year, quarter) {
+  return `Q${quarter} ${year}`;
 }
 
 function formatTableValue(value) {
-  const truncatedThousands = Math.trunc(value / 1000);
-  return `${truncatedThousands}k`;
+  return `${Math.trunc(value / 1000)}k`;
 }
 
-function tableHighlightTargets(applyTaxes) {
+function setStatus(message) {
+  document.getElementById("statusText").textContent = message;
+}
+
+function updatePrimaryWithdrawalLabel(amount = Number(document.getElementById("primaryWithdrawalAmount").value)) {
+  const label = document.getElementById("primaryWithdrawalAmountLabel");
+  label.textContent = amount > 0 ? `Amount (${currencyFormatter.format(amount)})` : "Amount";
+}
+
+function quarterValue(id) {
+  return Number(document.getElementById(id).dataset.quarter);
+}
+
+function setQuarterValue(id, quarter) {
+  const control = document.getElementById(id);
+  control.dataset.quarter = String(quarter);
+  for (const button of control.querySelectorAll("button")) {
+    button.classList.toggle("active", Number(button.dataset.quarter) === quarter);
+  }
+}
+
+function buildQuarterControl(id, onChange) {
+  const control = document.getElementById(id);
+  control.innerHTML = "";
+  for (const quarter of [1, 2, 3, 4]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "quarter-button";
+    button.dataset.quarter = String(quarter);
+    button.textContent = `Q${quarter}`;
+    button.addEventListener("click", () => {
+      setQuarterValue(id, quarter);
+      onChange();
+    });
+    control.appendChild(button);
+  }
+  setQuarterValue(id, Number(control.dataset.quarter || 1));
+}
+
+function normalizeRule(rule = {}, fallbackIndex = 0) {
+  const startYear = Number(rule.start_year ?? currentConfig.start_year);
+  const startQuarter = Number(rule.start_quarter ?? currentConfig.start_quarter);
   return {
-    "Q1 2026": applyTaxes ? 305000 : 308000,
-    "Q2 2026": applyTaxes ? 283751 : 287251,
+    name: String(rule.name || `Withdrawal ${fallbackIndex + 1}`),
+    amount: Math.max(0, Number(rule.amount || 0)),
+    cadence: ["once", "quarterly", "annual"].includes(rule.cadence) ? rule.cadence : "once",
+    start_year: startYear,
+    start_quarter: Number(rule.start_quarter ?? startQuarter),
+    end_year: Number(rule.end_year ?? startYear),
+    end_quarter: Number(rule.end_quarter ?? startQuarter),
+    ...(rule.special ? { special: String(rule.special) } : {}),
   };
 }
 
-function highlightedTwentileRows(rows, quarters, applyTaxes) {
-  const quarterTargets = tableHighlightTargets(applyTaxes);
-  const highlights = new Map();
-
-  for (const [quarterLabel, target] of Object.entries(quarterTargets)) {
-    const quarterIndex = quarters.indexOf(quarterLabel);
-    if (quarterIndex === -1) {
-      continue;
-    }
-
-    const targetShown = Math.trunc(target / 1000);
-    const rankedRows = rows
-      .map((row, rowIndex) => ({
-        rowIndex,
-        shownValue: Math.trunc(row.values[quarterIndex] / 1000),
-        distance: Math.abs(Math.trunc(row.values[quarterIndex] / 1000) - targetShown),
-      }))
-      .sort((left, right) => left.distance - right.distance || left.rowIndex - right.rowIndex);
-
-    const selectedRows = new Set([rankedRows[0].rowIndex]);
-    if (rankedRows.length > 1) {
-      const firstValue = rankedRows[0].shownValue;
-      const secondValue = rankedRows[1].shownValue;
-      const lowerValue = Math.min(firstValue, secondValue);
-      const upperValue = Math.max(firstValue, secondValue);
-      const q25 = lowerValue + 0.25 * (upperValue - lowerValue);
-      const q75 = lowerValue + 0.75 * (upperValue - lowerValue);
-
-      if (targetShown >= q25 && targetShown <= q75) {
-        selectedRows.add(rankedRows[1].rowIndex);
-      }
-    }
-    highlights.set(quarterLabel, selectedRows);
-  }
-
-  return highlights;
+function normalizePrimaryWithdrawal(rule = {}) {
+  const fallback = DEFAULT_CONFIG.primary_withdrawal;
+  return {
+    ...fallback,
+    ...normalizeRule(
+      {
+        ...fallback,
+        ...rule,
+        name: "Primary quarterly withdrawal",
+        cadence: "quarterly",
+        special: "primary_quarterly",
+      },
+      0
+    ),
+  };
 }
 
-function clearIdealWithdrawalResult() {
-  document.getElementById("idealWithdrawalResult").textContent = "";
+function normalizeConfig(config = {}) {
+  const incomingRules = Array.isArray(config.withdrawal_rules)
+    ? config.withdrawal_rules.map((rule, index) => normalizeRule(rule, index))
+    : [];
+  const primaryRule =
+    config.primary_withdrawal || incomingRules.find((rule) => rule.special === "primary_quarterly");
+
+  return {
+    ...DEFAULT_CONFIG,
+    ...config,
+    initial_balance: Math.max(0, Number(config.initial_balance ?? DEFAULT_CONFIG.initial_balance)),
+    start_year: Number(config.start_year ?? DEFAULT_CONFIG.start_year),
+    start_quarter: Number(config.start_quarter ?? DEFAULT_CONFIG.start_quarter),
+    end_year: Number(config.end_year ?? DEFAULT_CONFIG.end_year),
+    end_quarter: Number(config.end_quarter ?? DEFAULT_CONFIG.end_quarter),
+    goal_year: Number(config.goal_year ?? DEFAULT_CONFIG.goal_year),
+    goal_quarter: Number(config.goal_quarter ?? DEFAULT_CONFIG.goal_quarter),
+    goal_balance: Math.max(0, Number(config.goal_balance ?? DEFAULT_CONFIG.goal_balance)),
+    goal_percentile: Math.min(99, Math.max(1, Number(config.goal_percentile ?? DEFAULT_CONFIG.goal_percentile))),
+    mu: Number(config.mu ?? DEFAULT_CONFIG.mu),
+    sigma: Math.max(0, Number(config.sigma ?? DEFAULT_CONFIG.sigma)),
+    simulations: Math.min(250000, Math.max(1000, Number(config.simulations ?? DEFAULT_CONFIG.simulations))),
+    seed: Math.max(0, Number(config.seed ?? DEFAULT_CONFIG.seed)),
+    primary_withdrawal: normalizePrimaryWithdrawal(primaryRule),
+    withdrawal_rules: incomingRules.filter((rule) => rule.special !== "primary_quarterly"),
+  };
 }
 
-function updateInitialBalanceInput(baseInitialBalance, applyTaxes) {
-  const input = document.getElementById("initialBalance");
-  input.value = Math.round(displayedInitialBalance(applyTaxes, baseInitialBalance));
-  input.title = applyTaxes
-    ? `${currencyFormatter.format(baseInitialBalance)} with £3,500 tax withdrawals before each Q1`
-    : `${currencyFormatter.format(baseInitialBalance)} with no tax adjustment`;
+function combinedWithdrawalRules(config, options = {}) {
+  const primary = normalizePrimaryWithdrawal(config.primary_withdrawal);
+  const primaryRule =
+    primary.amount > 0 || options.includeZeroPrimary
+      ? [
+          {
+            ...primary,
+            name: "Primary quarterly withdrawal",
+            cadence: "quarterly",
+            special: "primary_quarterly",
+          },
+        ]
+      : [];
+  return [...primaryRule, ...config.withdrawal_rules.map((rule, index) => normalizeRule(rule, index))];
 }
 
-function updateEffectiveStats() {
-  const initialBalance = getBaseInitialBalance();
-  const payload = {
-    initial_balance: initialBalance,
-    apply_taxes: taxesEnabled(),
+function exportConfig(config = collectConfig(), options = {}) {
+  return {
+    ...config,
+    withdrawal_rules: combinedWithdrawalRules(config, options),
+  };
+}
+
+function collectConfig() {
+  return normalizeConfig({
+    initial_balance: Number(document.getElementById("initialBalance").value),
+    start_year: Number(document.getElementById("projectionStartYear").value),
+    start_quarter: quarterValue("projectionStartQuarter"),
+    end_year: Number(document.getElementById("projectionEndYear").value),
+    end_quarter: quarterValue("projectionEndQuarter"),
+    goal_year: Number(document.getElementById("goalYear").value),
+    goal_quarter: quarterValue("goalQuarter"),
+    goal_balance: Number(document.getElementById("goalBalance").value),
+    goal_percentile: Number(document.getElementById("goalPercentile").value),
     mu: Number(document.getElementById("mu").value),
     sigma: Number(document.getElementById("sigma").value),
-  };
-
-  return fetchJson("/api/effective-stats", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  }).then((result) => {
-    updateInitialBalanceInput(initialBalance, result.apply_taxes);
+    simulations: currentConfig.simulations,
+    seed: currentConfig.seed,
+    history_start_quarter: document.getElementById("startQuarter").value,
+    primary_withdrawal: {
+      name: "Primary quarterly withdrawal",
+      amount: Number(document.getElementById("primaryWithdrawalAmount").value),
+      cadence: "quarterly",
+      special: "primary_quarterly",
+      start_year: Number(document.getElementById("primaryWithdrawalStartYear").value),
+      start_quarter: Number(document.getElementById("primaryWithdrawalStartQuarter").value),
+      end_year: Number(document.getElementById("primaryWithdrawalEndYear").value),
+      end_quarter: Number(document.getElementById("primaryWithdrawalEndQuarter").value),
+    },
+    withdrawal_rules: Array.from(document.querySelectorAll(".rule-card")).map((card) => ({
+      name: card.querySelector("[data-field='name']").value,
+      amount: Number(card.querySelector("[data-field='amount']").value),
+      cadence: card.querySelector("[data-field='cadence']").value,
+      start_year: Number(card.querySelector("[data-field='start_year']").value),
+      start_quarter: Number(card.querySelector("[data-field='start_quarter']").value),
+      end_year: Number(card.querySelector("[data-field='end_year']").value),
+      end_quarter: Number(card.querySelector("[data-field='end_quarter']").value),
+    })),
   });
+}
+
+function applyConfig(config) {
+  currentConfig = normalizeConfig(config);
+  document.getElementById("initialBalance").value = currentConfig.initial_balance;
+  document.getElementById("projectionStartYear").value = currentConfig.start_year;
+  setQuarterValue("projectionStartQuarter", currentConfig.start_quarter);
+  document.getElementById("projectionEndYear").value = currentConfig.end_year;
+  setQuarterValue("projectionEndQuarter", currentConfig.end_quarter);
+  document.getElementById("goalYear").value = currentConfig.goal_year;
+  setQuarterValue("goalQuarter", currentConfig.goal_quarter);
+  document.getElementById("goalBalance").value = currentConfig.goal_balance;
+  document.getElementById("goalPercentile").value = currentConfig.goal_percentile;
+  document.getElementById("mu").value = currentConfig.mu;
+  document.getElementById("sigma").value = currentConfig.sigma;
+  document.getElementById("primaryWithdrawalAmount").value = currentConfig.primary_withdrawal.amount;
+  updatePrimaryWithdrawalLabel(currentConfig.primary_withdrawal.amount);
+  document.getElementById("primaryWithdrawalStartYear").value = currentConfig.primary_withdrawal.start_year;
+  document.getElementById("primaryWithdrawalStartQuarter").value = currentConfig.primary_withdrawal.start_quarter;
+  document.getElementById("primaryWithdrawalEndYear").value = currentConfig.primary_withdrawal.end_year;
+  document.getElementById("primaryWithdrawalEndQuarter").value = currentConfig.primary_withdrawal.end_quarter;
+  renderRules(currentConfig.withdrawal_rules);
+  if (currentConfig.history_start_quarter) {
+    document.getElementById("startQuarter").value = currentConfig.history_start_quarter;
+  }
+}
+
+function saveLocalConfig() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(exportConfig()));
+}
+
+function downloadConfig() {
+  const blob = new Blob([JSON.stringify(exportConfig(), null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "values.json";
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function renderRules(rules) {
+  const list = document.getElementById("rulesList");
+  list.innerHTML = "";
+  rules.forEach((rule, index) => list.appendChild(buildRuleCard(rule, index)));
+}
+
+function buildRuleCard(rule, index) {
+  const normalized = normalizeRule(rule, index);
+  const card = document.createElement("div");
+  card.className = "rule-card";
+  card.innerHTML = `
+    <div class="rule-grid">
+      <label><span>Name</span><input data-field="name" value="${escapeHtml(normalized.name)}" /></label>
+      <label><span>Amount</span><input data-field="amount" type="number" min="0" step="100" value="${normalized.amount}" /></label>
+      <label>
+        <span>Cadence</span>
+        <select data-field="cadence">
+          <option value="once">Once</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="annual">Annual</option>
+        </select>
+      </label>
+      <label><span>Start year</span><input data-field="start_year" type="number" min="1900" max="2200" value="${normalized.start_year}" /></label>
+      <label><span>Start Q</span><select data-field="start_quarter">${quarterOptions(normalized.start_quarter)}</select></label>
+      <label><span>End year</span><input data-field="end_year" type="number" min="1900" max="2200" value="${normalized.end_year}" /></label>
+      <label><span>End Q</span><select data-field="end_quarter">${quarterOptions(normalized.end_quarter)}</select></label>
+      <button class="rule-remove" type="button">Remove</button>
+    </div>
+  `;
+  card.querySelector("[data-field='cadence']").value = normalized.cadence;
+  card.querySelector(".rule-remove").addEventListener("click", () => {
+    card.remove();
+    saveLocalConfig();
+    runSimulation();
+  });
+  card.querySelectorAll("input, select").forEach((input) => {
+    input.addEventListener("change", () => {
+      saveLocalConfig();
+      runSimulation();
+    });
+  });
+  return card;
+}
+
+function quarterOptions(selectedQuarter) {
+  return [1, 2, 3, 4]
+    .map((quarter) => `<option value="${quarter}"${quarter === selectedQuarter ? " selected" : ""}>Q${quarter}</option>`)
+    .join("");
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    const detail = await response.json().catch(() => ({}));
+    throw new Error(detail.detail || `Request failed: ${response.status}`);
   }
   return response.json();
 }
@@ -153,7 +345,7 @@ function renderHistoryChart(records, selectedQuarter, endQuarter) {
         mode: "lines",
         x: quarters,
         y: values,
-        line: { color: "#0f4c5c", width: 2.5 },
+        line: { color: "#176b87", width: 2.5 },
         hovertemplate: `Start %{x}<br>Annualized total return to ${endQuarter}: %{y:.2f}%<extra></extra>`,
       },
       {
@@ -161,7 +353,7 @@ function renderHistoryChart(records, selectedQuarter, endQuarter) {
         mode: "markers",
         x: selectedRecord ? [selectedRecord.quarter] : [],
         y: selectedRecord ? [selectedRecord.annualized_return * 100] : [],
-        marker: { color: "#d95f02", size: 11 },
+        marker: { color: "#b45309", size: 11 },
         hovertemplate: `Selected %{x}<br>Annualized total return to ${endQuarter}: %{y:.2f}%<extra></extra>`,
       },
     ],
@@ -177,18 +369,7 @@ function renderHistoryChart(records, selectedQuarter, endQuarter) {
   );
 }
 
-async function loadHistoryData() {
-  const history = await fetchJson("/api/history?apply_taxes=false");
-  historyRecords = history.records;
-  historyEndQuarter = history.end_quarter;
-  const currentSelection = document.getElementById("startQuarter").value;
-  buildHistoryOptions(history.quarters);
-  document.getElementById("startQuarter").value =
-    history.quarters.includes(currentSelection) && currentSelection ? currentSelection : history.default_stats.start_quarter;
-  return history;
-}
-
-function renderProjectionChart(series) {
+function renderProjectionChart(series, goal) {
   const traces = series.map((entry) => ({
     type: "scatter",
     mode: "lines",
@@ -200,6 +381,15 @@ function renderProjectionChart(series) {
     },
     hovertemplate: `${entry.percentile}th percentile<br>%{x}: %{y:,.0f}<extra></extra>`,
   }));
+  traces.push({
+    type: "scatter",
+    mode: "markers",
+    name: "Goal",
+    x: [goal.quarter],
+    y: [goal.balance],
+    marker: { color: "#b45309", size: 12, symbol: "diamond" },
+    hovertemplate: `Goal<br>${goal.quarter}: %{y:,.0f}<extra></extra>`,
+  });
 
   Plotly.newPlot(
     "projectionChart",
@@ -218,11 +408,9 @@ function renderProjectionChart(series) {
   );
 }
 
-function renderTwentileTable(rows, quarters, applyTaxes) {
+function renderTwentileTable(rows, quarters) {
   const thead = document.querySelector("#twentileTable thead");
   const tbody = document.querySelector("#twentileTable tbody");
-  const highlights = highlightedTwentileRows(rows, quarters, applyTaxes);
-
   thead.innerHTML = "";
   tbody.innerHTML = "";
 
@@ -237,149 +425,172 @@ function renderTwentileTable(rows, quarters, applyTaxes) {
   }
   thead.appendChild(headRow);
 
-  for (const [rowIndex, row] of rows.entries()) {
+  for (const row of rows) {
     const tr = document.createElement("tr");
     const label = document.createElement("th");
     label.textContent = `P${row.percentile}`;
     tr.appendChild(label);
-    for (const [quarterIndex, value] of row.values.entries()) {
+    for (const value of row.values) {
       const td = document.createElement("td");
-      const displayValue = formatTableValue(value);
-      const quarterLabel = quarters[quarterIndex];
-      if (highlights.get(quarterLabel)?.has(rowIndex)) {
-        td.classList.add("table-highlight");
-        const strong = document.createElement("strong");
-        strong.textContent = displayValue;
-        td.appendChild(strong);
-      } else {
-        td.textContent = displayValue;
-      }
+      td.textContent = formatTableValue(value);
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
   }
 }
 
+async function loadHistoryData() {
+  const history = await fetchJson("/api/history");
+  historyRecords = history.records;
+  buildHistoryOptions(history.quarters);
+  const requestedQuarter = currentConfig.history_start_quarter;
+  document.getElementById("startQuarter").value =
+    requestedQuarter && history.quarters.includes(requestedQuarter) ? requestedQuarter : history.default_stats.start_quarter;
+  return history;
+}
+
 async function applyHistoryStats(applyToInputs = true) {
   const startQuarter = document.getElementById("startQuarter").value;
-  const untaxedStats = await fetchJson(
-    `/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}&apply_taxes=false`
-  );
-  const stats = untaxedStats;
+  const stats = await fetchJson(`/api/history/stats?start_quarter=${encodeURIComponent(startQuarter)}`);
   if (applyToInputs) {
     document.getElementById("mu").value = stats.mu.toFixed(4);
     document.getElementById("sigma").value = stats.sigma.toFixed(4);
   }
-  await updateEffectiveStats();
+  document.getElementById("returnStats").textContent =
+    `Annualized return from ${stats.start_quarter} to ${stats.end_quarter}: ` +
+    `${percentFormatter.format(stats.annualized_return * 100)}%. ` +
+    `Quarterly mu ${numberFormatter.format(stats.mu)}, sigma ${numberFormatter.format(stats.sigma)}.`;
   renderHistoryChart(historyRecords, startQuarter, stats.end_quarter);
 }
 
-async function runSimulation() {
-  const payload = {
-    initial_balance: getBaseInitialBalance(),
-    apply_taxes: taxesEnabled(),
-    withdrawal: Number(document.getElementById("withdrawal").value),
-    mu: Number(document.getElementById("mu").value),
-    sigma: Number(document.getElementById("sigma").value),
-    simulations: Number(document.getElementById("simulations").value),
-    seed: Number(document.getElementById("seed").value),
-  };
+function simulationPayload() {
+  return exportConfig();
+}
 
+async function runSimulation() {
+  const payload = simulationPayload();
   const result = await fetchJson("/api/simulate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
-  renderProjectionChart(result.chart_percentiles);
-  renderTwentileTable(result.twentiles, result.quarters, taxesEnabled());
+  renderProjectionChart(result.chart_percentiles, result.goal);
+  renderTwentileTable(result.twentiles, result.quarters);
+  document.getElementById("goalStats").textContent =
+    `P${result.goal.percentile} at ${result.goal.quarter}: ${currencyFormatter.format(result.goal.actual_balance)} ` +
+    `${result.goal.met ? "meets" : "is below"} the ${currencyFormatter.format(result.goal.balance)} goal by ` +
+    `${currencyFormatter.format(Math.abs(result.goal.gap))}.`;
+  saveLocalConfig();
+  setStatus(`Projection range: ${result.quarters[0]} to ${result.quarters.at(-1)}.`);
 }
 
 async function findIdealWithdrawal() {
-  const payload = {
-    initial_balance: getBaseInitialBalance(),
-    apply_taxes: taxesEnabled(),
-    mu: Number(document.getElementById("mu").value),
-    sigma: Number(document.getElementById("sigma").value),
-    simulations: Number(document.getElementById("simulations").value),
-    seed: Number(document.getElementById("seed").value),
-  };
-
+  const config = collectConfig();
   const result = await fetchJson("/api/ideal-withdrawal", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(exportConfig(config, { includeZeroPrimary: true })),
   });
-
-  document.getElementById("withdrawal").value = result.recommended_withdrawal.toFixed(0);
+  document.getElementById("primaryWithdrawalAmount").value = result.recommended_withdrawal.toFixed(0);
+  updatePrimaryWithdrawalLabel(result.recommended_withdrawal);
+  await runSimulation();
   document.getElementById("idealWithdrawalResult").textContent =
-    `Ideal X for a 5th percentile of £100k at the start of ${result.target_quarter}: ` +
-    `${currencyFormatter.format(result.recommended_withdrawal)}. ` +
-    `Achieved 5th percentile: ${currencyFormatter.format(result.achieved_balance)}.`;
-  await runSimulation();
+    `Primary quarterly withdrawal set to target P${result.percentile} ${currencyFormatter.format(result.target_balance)} ` +
+    `at ${result.target_quarter}: ${currencyFormatter.format(result.recommended_withdrawal)}. ` +
+    `Achieved: ${currencyFormatter.format(result.achieved_balance)}.`;
 }
 
-async function refreshTaxMode() {
-  const baseInitialBalance = getBaseInitialBalance(lastTaxMode);
-  lastTaxMode = taxesEnabled();
-  updateInitialBalanceInput(baseInitialBalance, lastTaxMode);
-  clearIdealWithdrawalResult();
-  await applyHistoryStats(false);
-  await runSimulation();
+function bindInputs() {
+  document.querySelectorAll("input, select").forEach((input) => {
+    if (input.id === "configFile") {
+      return;
+    }
+    input.addEventListener("change", () => {
+      document.getElementById("idealWithdrawalResult").textContent = "";
+      if (input.id === "primaryWithdrawalAmount") {
+        updatePrimaryWithdrawalLabel(Number(input.value));
+      }
+      runSimulation().catch((error) => setStatus(`Error: ${error.message}`));
+    });
+  });
 }
 
-async function resetInitialBalance() {
-  updateInitialBalanceInput(DEFAULT_INITIAL_BALANCE, taxesEnabled());
-  clearIdealWithdrawalResult();
-  await updateEffectiveStats();
+function addRuleFromCurrentRange() {
+  const config = collectConfig();
+  const rule = normalizeRule(
+    {
+      name: "Withdrawal",
+      amount: 0,
+      cadence: "once",
+      start_year: config.start_year,
+      start_quarter: config.start_quarter,
+      end_year: config.start_year,
+      end_quarter: config.start_quarter,
+    },
+    config.withdrawal_rules.length
+  );
+  document.getElementById("rulesList").appendChild(buildRuleCard(rule, config.withdrawal_rules.length));
+  saveLocalConfig();
+}
+
+async function importConfig(file) {
+  const text = await file.text();
+  const config = normalizeConfig(JSON.parse(text));
+  applyConfig(config);
+  saveLocalConfig();
   await runSimulation();
+  setStatus(`Loaded ${file.name}.`);
 }
 
 async function init() {
-  const history = await loadHistoryData();
-  lastTaxMode = taxesEnabled();
-  const initialBalanceInput = document.getElementById("initialBalance");
-  const usingDefaultInitialValue =
-    initialBalanceInput.value === "" || initialBalanceInput.value === initialBalanceInput.defaultValue;
-  if (usingDefaultInitialValue) {
-    updateInitialBalanceInput(DEFAULT_INITIAL_BALANCE, lastTaxMode);
-  } else {
-    updateInitialBalanceInput(getBaseInitialBalance(lastTaxMode), lastTaxMode);
+  buildQuarterControl("projectionStartQuarter", () => runSimulation().catch((error) => setStatus(`Error: ${error.message}`)));
+  buildQuarterControl("projectionEndQuarter", () => runSimulation().catch((error) => setStatus(`Error: ${error.message}`)));
+  buildQuarterControl("goalQuarter", () => runSimulation().catch((error) => setStatus(`Error: ${error.message}`)));
+
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    currentConfig = normalizeConfig(JSON.parse(saved));
+    setStatus("Loaded saved browser values.");
   }
+
+  applyConfig(currentConfig);
+  await loadHistoryData();
   await applyHistoryStats();
+  bindInputs();
   await runSimulation();
 
-  document.getElementById("resetInitialBalance").addEventListener("click", resetInitialBalance);
   document.getElementById("useHistory").addEventListener("click", () => {
-    clearIdealWithdrawalResult();
-    applyHistoryStats();
+    applyHistoryStats().then(runSimulation).catch((error) => setStatus(`Error: ${error.message}`));
   });
-  document.getElementById("idealWithdrawal").addEventListener("click", findIdealWithdrawal);
-  document.getElementById("runSimulation").addEventListener("click", runSimulation);
-  document.getElementById("startQuarter").addEventListener("change", () => {
-    clearIdealWithdrawalResult();
-    applyHistoryStats();
+  document.getElementById("runSimulation").addEventListener("click", () => {
+    runSimulation().catch((error) => setStatus(`Error: ${error.message}`));
   });
-  document.getElementById("applyTaxes").addEventListener("change", refreshTaxMode);
-  document.getElementById("mu").addEventListener("change", () => {
-    clearIdealWithdrawalResult();
-    updateEffectiveStats();
+  document.getElementById("idealWithdrawal").addEventListener("click", () => {
+    findIdealWithdrawal().catch((error) => setStatus(`Error: ${error.message}`));
   });
-  document.getElementById("sigma").addEventListener("change", () => {
-    clearIdealWithdrawalResult();
-    updateEffectiveStats();
+  document.getElementById("addRule").addEventListener("click", addRuleFromCurrentRange);
+  document.getElementById("resetConfig").addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    applyConfig(DEFAULT_CONFIG);
+    runSimulation().catch((error) => setStatus(`Error: ${error.message}`));
   });
-  document.getElementById("initialBalance").addEventListener("change", () => {
-    clearIdealWithdrawalResult();
-    updateEffectiveStats().then(runSimulation);
+  document.getElementById("saveConfig").addEventListener("click", () => {
+    saveLocalConfig();
+    downloadConfig();
   });
-  document.getElementById("withdrawal").addEventListener("change", clearIdealWithdrawalResult);
-  document.getElementById("simulations").addEventListener("change", clearIdealWithdrawalResult);
-  document.getElementById("seed").addEventListener("change", clearIdealWithdrawalResult);
+  document.getElementById("loadConfig").addEventListener("click", () => {
+    document.getElementById("configFile").click();
+  });
+  document.getElementById("configFile").addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      importConfig(file).catch((error) => setStatus(`Error: ${error.message}`));
+    }
+    event.target.value = "";
+  });
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  init().catch((error) => {
-    document.getElementById("historyStats").textContent = `Error: ${error.message}`;
-  });
+  init().catch((error) => setStatus(`Error: ${error.message}`));
 });
