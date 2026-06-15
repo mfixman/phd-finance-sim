@@ -117,15 +117,6 @@ function updateEffectiveStats() {
     body: JSON.stringify(payload),
   }).then((result) => {
     updateInitialBalanceInput(initialBalance, result.apply_taxes);
-    document.getElementById("effectiveStats").textContent =
-      `Base starting balance ${currencyFormatter.format(initialBalance)}. ` +
-      `${result.apply_taxes ? "With taxes" : "Without taxes"} the effective starting balance is ${currencyFormatter.format(
-        result.effective_initial_balance
-      )}. ` +
-      `Implied yearly return distribution from the selected quarterly log parameters: ` +
-      `mean ${percentFormatter.format(result.yearly_mean * 100)}%, std ${percentFormatter.format(
-        result.yearly_std * 100
-      )}%.`;
   });
 }
 
@@ -150,6 +141,7 @@ function buildHistoryOptions(quarters) {
 
 function renderHistoryChart(records, selectedQuarter, endQuarter) {
   const quarters = records.map((record) => record.quarter);
+  const q1Quarters = quarters.filter((quarter) => quarter.endsWith("Q1"));
   const values = records.map((record) => record.annualized_return * 100);
   const selectedRecord = records.find((record) => record.quarter === selectedQuarter);
 
@@ -177,7 +169,7 @@ function renderHistoryChart(records, selectedQuarter, endQuarter) {
       margin: { t: 12, r: 12, b: 72, l: 56 },
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
-      xaxis: { tickangle: -45 },
+      xaxis: { tickangle: -45, tickmode: "array", tickvals: q1Quarters, ticktext: q1Quarters },
       yaxis: { title: "Annualized total return (% per year)" },
       showlegend: false,
     },
@@ -278,19 +270,6 @@ async function applyHistoryStats(applyToInputs = true) {
     document.getElementById("mu").value = stats.mu.toFixed(4);
     document.getElementById("sigma").value = stats.sigma.toFixed(4);
   }
-  document.getElementById(
-    "historyStats"
-  ).textContent =
-    `From ${stats.start_quarter} through ${stats.end_quarter} inclusive: ` +
-    `pre-tax annualized total return ${percentFormatter.format(stats.annualized_return * 100)}% per year. ` +
-    `Quarterly log mu ${numberFormatter.format(stats.mu)}, quarterly log sigma ${numberFormatter.format(stats.sigma)}, ` +
-    `${stats.observations} quarterly observations. These are the parameters used for simulation.`;
-  document.getElementById("verificationStats").textContent =
-    `Verification for ${startQuarter} to ${stats.end_quarter}: ` +
-    `annualized growth ${percentFormatter.format(untaxedStats.annualized_return * 100)}% per year, ` +
-    `quarterly log mu ${numberFormatter.format(untaxedStats.mu)}, quarterly log sigma ${numberFormatter.format(
-      untaxedStats.sigma
-    )}. Sigma here is a standard deviation of log returns, so it is not a percent figure. Tax mode uses the same return parameters and applies fixed Q1 cash withdrawals during the simulation.`;
   await updateEffectiveStats();
   renderHistoryChart(historyRecords, startQuarter, stats.end_quarter);
 }
