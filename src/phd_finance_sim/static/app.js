@@ -32,11 +32,22 @@ const DEFAULT_CONFIG = {
     cadence: "quarterly",
     special: "primary_quarterly",
   },
-  withdrawal_rules: [],
+  withdrawal_rules: [
+    {
+      name: "Withdrawal",
+      amount: 0,
+      start_year: 2025,
+      start_quarter: 4,
+      end_year: 2025,
+      end_quarter: 4,
+      cadence: "once",
+    },
+  ],
   goal_year: 2029,
   goal_quarter: 4,
   goal_balance: 500000,
   goal_percentile: 5,
+  money_values: {},
   mu: 0.02,
   sigma: 0.08,
   simulations: 40000,
@@ -46,6 +57,8 @@ const DEFAULT_CONFIG = {
 
 let historyRecords = [];
 let currentConfig = structuredClone(DEFAULT_CONFIG);
+let lastTwentileRows = [];
+let lastTwentileQuarters = [];
 
 function quarterLabel(year, quarter) {
   return `Q${quarter} ${year}`;
@@ -62,6 +75,13 @@ function setStatus(message) {
 function updatePrimaryWithdrawalLabel(amount = Number(document.getElementById("primaryWithdrawalAmount").value)) {
   const label = document.getElementById("primaryWithdrawalAmountLabel");
   label.textContent = amount > 0 ? `Amount (${currencyFormatter.format(amount)})` : "Amount";
+}
+
+function updateGoalQuarterText(config = collectConfig()) {
+  const target = document.getElementById("goalQuarterText");
+  if (target) {
+    target.textContent = `Goal quarter: ${quarterLabel(config.end_year, config.end_quarter)} (projection end).`;
+  }
 }
 
 function quarterValue(id) {
@@ -126,10 +146,27 @@ function normalizePrimaryWithdrawal(rule = {}) {
   };
 }
 
+function normalizeMoneyValues(values = {}) {
+  return Object.fromEntries(
+    Object.entries(values)
+      .map(([quarter, amounts]) => {
+        const normalizedAmounts = (Array.isArray(amounts) ? amounts : [amounts])
+          .map((amount) => Number(amount))
+          .filter(Number.isFinite)
+          .slice(0, 2);
+        return [String(quarter), normalizedAmounts];
+      })
+      .filter(([, amounts]) => amounts.length > 0)
+  );
+}
+
 function normalizeConfig(config = {}) {
-  const incomingRules = Array.isArray(config.withdrawal_rules)
-    ? config.withdrawal_rules.map((rule, index) => normalizeRule(rule, index))
-    : [];
+  const startYear = Number(config.start_year ?? DEFAULT_CONFIG.start_year);
+  const startQuarter = Number(config.start_quarter ?? DEFAULT_CONFIG.start_quarter);
+  const endYear = Number(config.end_year ?? DEFAULT_CONFIG.end_year);
+  const endQuarter = Number(config.end_quarter ?? DEFAULT_CONFIG.end_quarter);
+  const rawRules = Array.isArray(config.withdrawal_rules) ? config.withdrawal_rules : DEFAULT_CONFIG.withdrawal_rules;
+  const incomingRules = rawRules.map((rule, index) => normalizeRule(rule, index));
   const primaryRule =
     config.primary_withdrawal || incomingRules.find((rule) => rule.special === "primary_quarterly");
 
@@ -137,14 +174,15 @@ function normalizeConfig(config = {}) {
     ...DEFAULT_CONFIG,
     ...config,
     initial_balance: Math.max(0, Number(config.initial_balance ?? DEFAULT_CONFIG.initial_balance)),
-    start_year: Number(config.start_year ?? DEFAULT_CONFIG.start_year),
-    start_quarter: Number(config.start_quarter ?? DEFAULT_CONFIG.start_quarter),
-    end_year: Number(config.end_year ?? DEFAULT_CONFIG.end_year),
-    end_quarter: Number(config.end_quarter ?? DEFAULT_CONFIG.end_quarter),
-    goal_year: Number(config.goal_year ?? DEFAULT_CONFIG.goal_year),
-    goal_quarter: Number(config.goal_quarter ?? DEFAULT_CONFIG.goal_quarter),
+    start_year: startYear,
+    start_quarter: startQuarter,
+    end_year: endYear,
+    end_quarter: endQuarter,
+    goal_year: endYear,
+    goal_quarter: endQuarter,
     goal_balance: Math.max(0, Number(config.goal_balance ?? DEFAULT_CONFIG.goal_balance)),
     goal_percentile: Math.min(99, Math.max(1, Number(config.goal_percentile ?? DEFAULT_CONFIG.goal_percentile))),
+    money_values: normalizeMoneyValues(config.money_values),
     mu: Number(config.mu ?? DEFAULT_CONFIG.mu),
     sigma: Math.max(0, Number(config.sigma ?? DEFAULT_CONFIG.sigma)),
     simulations: Math.min(250000, Math.max(1000, Number(config.simulations ?? DEFAULT_CONFIG.simulations))),
@@ -178,16 +216,19 @@ function exportConfig(config = collectConfig(), options = {}) {
 }
 
 function collectConfig() {
+  const endYear = Number(document.getElementById("projectionEndYear").value);
+  const endQuarter = quarterValue("projectionEndQuarter");
   return normalizeConfig({
     initial_balance: Number(document.getElementById("initialBalance").value),
     start_year: Number(document.getElementById("projectionStartYear").value),
     start_quarter: quarterValue("projectionStartQuarter"),
-    end_year: Number(document.getElementById("projectionEndYear").value),
-    end_quarter: quarterValue("projectionEndQuarter"),
-    goal_year: Number(document.getElementById("goalYear").value),
-    goal_quarter: quarterValue("goalQuarter"),
+    end_year: endYear,
+    end_quarter: endQuarter,
+    goal_year: endYear,
+    goal_quarter: endQuarter,
     goal_balance: Number(document.getElementById("goalBalance").value),
     goal_percentile: Number(document.getElementById("goalPercentile").value),
+    money_values: currentConfig.money_values,
     mu: Number(document.getElementById("mu").value),
     sigma: Number(document.getElementById("sigma").value),
     simulations: currentConfig.simulations,
@@ -222,10 +263,9 @@ function applyConfig(config) {
   setQuarterValue("projectionStartQuarter", currentConfig.start_quarter);
   document.getElementById("projectionEndYear").value = currentConfig.end_year;
   setQuarterValue("projectionEndQuarter", currentConfig.end_quarter);
-  document.getElementById("goalYear").value = currentConfig.goal_year;
-  setQuarterValue("goalQuarter", currentConfig.goal_quarter);
   document.getElementById("goalBalance").value = currentConfig.goal_balance;
   document.getElementById("goalPercentile").value = currentConfig.goal_percentile;
+  updateGoalQuarterText(currentConfig);
   document.getElementById("mu").value = currentConfig.mu;
   document.getElementById("sigma").value = currentConfig.sigma;
   document.getElementById("primaryWithdrawalAmount").value = currentConfig.primary_withdrawal.amount;
@@ -409,8 +449,11 @@ function renderProjectionChart(series, goal) {
 }
 
 function renderTwentileTable(rows, quarters) {
+  lastTwentileRows = rows;
+  lastTwentileQuarters = quarters;
   const thead = document.querySelector("#twentileTable thead");
   const tbody = document.querySelector("#twentileTable tbody");
+  const highlights = highlightedTwentileRows(rows, quarters);
   thead.innerHTML = "";
   tbody.innerHTML = "";
 
@@ -425,18 +468,102 @@ function renderTwentileTable(rows, quarters) {
   }
   thead.appendChild(headRow);
 
-  for (const row of rows) {
+  for (const [rowIndex, row] of rows.entries()) {
     const tr = document.createElement("tr");
     const label = document.createElement("th");
     label.textContent = `P${row.percentile}`;
     tr.appendChild(label);
-    for (const value of row.values) {
+    for (const [quarterIndex, value] of row.values.entries()) {
       const td = document.createElement("td");
+      const quarter = quarters[quarterIndex];
       td.textContent = formatTableValue(value);
+      td.dataset.quarter = quarter;
+      td.dataset.rowIndex = String(rowIndex);
+      td.dataset.quarterIndex = String(quarterIndex);
+      td.dataset.value = String(value);
+      td.title = `${quarter} P${row.percentile}: ${currencyFormatter.format(value)}`;
+      if (highlights.get(quarter)?.has(rowIndex)) {
+        td.classList.add("table-highlight");
+      }
+      td.addEventListener("click", handleTwentileCellClick);
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
   }
+}
+
+function highlightedTwentileRows(rows, quarters) {
+  const highlights = new Map();
+  const moneyValues = normalizeMoneyValues(currentConfig.money_values);
+
+  for (const [quarter, values] of Object.entries(moneyValues)) {
+    const quarterIndex = quarters.indexOf(quarter);
+    if (quarterIndex === -1) {
+      continue;
+    }
+    const selectedRows = new Set();
+    for (const value of values) {
+      let bestRow = 0;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      rows.forEach((row, rowIndex) => {
+        const distance = Math.abs(row.values[quarterIndex] - value);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestRow = rowIndex;
+        }
+      });
+      selectedRows.add(bestRow);
+    }
+    const orderedRows = [...selectedRows].sort((left, right) => left - right);
+    if (orderedRows.length === 1 || (orderedRows.length === 2 && Math.abs(orderedRows[0] - orderedRows[1]) === 1)) {
+      highlights.set(quarter, new Set(orderedRows.slice(0, 2)));
+    } else if (orderedRows.length > 0) {
+      highlights.set(quarter, new Set([orderedRows[0]]));
+    }
+  }
+
+  return highlights;
+}
+
+function selectedRowsForQuarter(quarter) {
+  return Array.from(document.querySelectorAll("#twentileTable td.table-highlight"))
+    .filter((cell) => cell.dataset.quarter === quarter)
+    .map((cell) => Number(cell.dataset.rowIndex))
+    .sort((left, right) => left - right);
+}
+
+function saveMoneyValuesForQuarter(quarter, rowIndexes) {
+  const quarterIndex = lastTwentileQuarters.indexOf(quarter);
+  const nextValues = { ...normalizeMoneyValues(currentConfig.money_values) };
+  if (quarterIndex === -1 || rowIndexes.length === 0) {
+    delete nextValues[quarter];
+  } else {
+    nextValues[quarter] = rowIndexes
+      .slice(0, 2)
+      .map((rowIndex) => lastTwentileRows[rowIndex]?.values[quarterIndex])
+      .filter(Number.isFinite);
+  }
+  currentConfig = normalizeConfig({ ...collectConfig(), money_values: nextValues });
+  saveLocalConfig();
+  renderTwentileTable(lastTwentileRows, lastTwentileQuarters);
+}
+
+function handleTwentileCellClick(event) {
+  const cell = event.currentTarget;
+  const quarter = cell.dataset.quarter;
+  const rowIndex = Number(cell.dataset.rowIndex);
+  const selectedRows = selectedRowsForQuarter(quarter);
+  let nextRows;
+
+  if (selectedRows.includes(rowIndex)) {
+    nextRows = selectedRows.filter((selectedRow) => selectedRow !== rowIndex);
+  } else if (selectedRows.length === 1 && Math.abs(selectedRows[0] - rowIndex) === 1) {
+    nextRows = [...selectedRows, rowIndex].sort((left, right) => left - right);
+  } else {
+    nextRows = [rowIndex];
+  }
+
+  saveMoneyValuesForQuarter(quarter, nextRows);
 }
 
 async function loadHistoryData() {
@@ -459,7 +586,7 @@ async function applyHistoryStats(applyToInputs = true) {
   document.getElementById("returnStats").textContent =
     `Annualized return from ${stats.start_quarter} to ${stats.end_quarter}: ` +
     `${percentFormatter.format(stats.annualized_return * 100)}%. ` +
-    `Quarterly mu ${numberFormatter.format(stats.mu)}, sigma ${numberFormatter.format(stats.sigma)}.`;
+    `Quarterly lognormal mu ${numberFormatter.format(stats.mu)}, sigma ${numberFormatter.format(stats.sigma)}.`;
   renderHistoryChart(historyRecords, startQuarter, stats.end_quarter);
 }
 
@@ -511,6 +638,9 @@ function bindInputs() {
       if (input.id === "primaryWithdrawalAmount") {
         updatePrimaryWithdrawalLabel(Number(input.value));
       }
+      if (input.id === "projectionEndYear") {
+        updateGoalQuarterText();
+      }
       runSimulation().catch((error) => setStatus(`Error: ${error.message}`));
     });
   });
@@ -545,8 +675,10 @@ async function importConfig(file) {
 
 async function init() {
   buildQuarterControl("projectionStartQuarter", () => runSimulation().catch((error) => setStatus(`Error: ${error.message}`)));
-  buildQuarterControl("projectionEndQuarter", () => runSimulation().catch((error) => setStatus(`Error: ${error.message}`)));
-  buildQuarterControl("goalQuarter", () => runSimulation().catch((error) => setStatus(`Error: ${error.message}`)));
+  buildQuarterControl("projectionEndQuarter", () => {
+    updateGoalQuarterText();
+    runSimulation().catch((error) => setStatus(`Error: ${error.message}`));
+  });
 
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {

@@ -6,9 +6,9 @@
     <meta http-equiv="Cache-Control" content="no-store" />
     <meta http-equiv="Pragma" content="no-cache" />
     <title>Unemployment Withdrawal Simulator</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260615-6" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260616-1" />
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
-    <script src="/static/app.js?v=20260615-6" defer></script>
+    <script src="/static/app.js?v=20260616-1" defer></script>
   </head>
   <body>
     <main class="layout">
@@ -17,9 +17,9 @@
         <h1>Unemployment Withdrawal Simulator</h1>
       </section>
 
-      <section class="panel controls">
+      <section class="panel initial-panel">
         <div class="panel-header">
-          <h2>Scenario</h2>
+          <h2>Initial funds</h2>
           <div class="file-actions">
             <input id="configFile" type="file" accept="application/json,.json" />
             <button id="loadConfig" type="button">Load values.json</button>
@@ -30,11 +30,16 @@
 
         <div class="field-grid">
           <label>
-            <span>Initial value</span>
+            <span>Initial funds</span>
             <input id="initialBalance" type="number" min="0" step="100" value="500000" />
           </label>
         </div>
+      </section>
 
+      <section class="panel projection-panel">
+        <div class="panel-header">
+          <h2>Projection</h2>
+        </div>
         <div class="date-grid">
           <div class="date-card">
             <h3>Projection range</h3>
@@ -73,18 +78,8 @@
               <select id="startQuarter"></select>
             </label>
           </div>
-          <button id="useHistory" class="secondary return-action" type="button">Use historical mu/sigma</button>
+          <button id="useHistory" class="secondary return-action" type="button">Use historical lognormal mu/sigma</button>
           <p id="returnStats" class="inline-stat"></p>
-        </div>
-
-        <div class="actions">
-          <button id="runSimulation" class="primary-action" type="button">Run simulation</button>
-        </div>
-
-        <div class="notes">
-          <p id="statusText"></p>
-          <p id="goalStats"></p>
-          <p id="idealWithdrawalResult"></p>
         </div>
       </section>
 
@@ -92,6 +87,27 @@
         <div class="panel-header">
           <h2>Withdrawals</h2>
           <button id="addRule" type="button">Add rule</button>
+        </div>
+        <div id="rulesList" class="rules-list"></div>
+      </section>
+
+      <section class="panel goal-panel">
+        <div class="panel-header">
+          <h2>Goal</h2>
+        </div>
+        <div class="date-card">
+          <p id="goalQuarterText" class="inline-stat"></p>
+          <div class="goal-row">
+            <label>
+              <span>Balance</span>
+              <input id="goalBalance" type="number" min="0" step="100" value="500000" />
+            </label>
+            <label>
+              <span>Percentile</span>
+              <input id="goalPercentile" type="number" min="1" max="99" step="1" value="5" />
+            </label>
+          </div>
+          <button id="idealWithdrawal" class="goal-action" type="button">Adjust withdrawal</button>
         </div>
         <div class="primary-withdrawal">
           <h3>Primary quarterly withdrawal</h3>
@@ -128,30 +144,13 @@
             </label>
           </div>
         </div>
-        <div id="rulesList" class="rules-list"></div>
-      </section>
-
-      <section class="panel goal-panel">
-        <div class="panel-header">
-          <h2>Goal</h2>
+        <div class="actions">
+          <button id="runSimulation" class="primary-action" type="button">Run simulation</button>
         </div>
-        <div class="date-card">
-          <label>
-            <span>Year</span>
-            <input id="goalYear" type="number" min="1900" max="2200" step="1" value="2029" />
-          </label>
-          <div id="goalQuarter" class="quarter-control" data-quarter="4"></div>
-          <div class="goal-row">
-            <label>
-              <span>Balance</span>
-              <input id="goalBalance" type="number" min="0" step="100" value="500000" />
-            </label>
-            <label>
-              <span>Percentile</span>
-              <input id="goalPercentile" type="number" min="1" max="99" step="1" value="5" />
-            </label>
-          </div>
-          <button id="idealWithdrawal" class="goal-action" type="button">Adjust withdrawal</button>
+        <div class="notes">
+          <p id="statusText"></p>
+          <p id="goalStats"></p>
+          <p id="idealWithdrawalResult"></p>
         </div>
       </section>
 

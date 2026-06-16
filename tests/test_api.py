@@ -80,6 +80,29 @@ def test_simulate_endpoint_applies_arbitrary_annual_withdrawal() -> None:
     assert payload["chart_percentiles"][3]["values"][5] == 398_500.0
 
 
+def test_simulate_endpoint_uses_projection_end_as_goal_quarter() -> None:
+    response = client.post(
+        "/api/simulate",
+        json={
+            "initial_balance": 120000,
+            "start_year": 2025,
+            "start_quarter": 4,
+            "end_year": 2026,
+            "end_quarter": 2,
+            "goal_year": 2026,
+            "goal_quarter": 4,
+            "goal_balance": 100000,
+            "goal_percentile": 5,
+            "mu": 0.0,
+            "sigma": 0.0,
+            "simulations": 100,
+            "seed": 1,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["goal"]["quarter"] == "Q2 2026"
+
+
 def test_ideal_withdrawal_endpoint_returns_recommendation() -> None:
     response = client.post(
         "/api/ideal-withdrawal",

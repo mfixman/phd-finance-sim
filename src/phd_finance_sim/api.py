@@ -80,6 +80,25 @@ class EffectiveStatsRequest(BaseModel):
     sigma: float = Field(default=DEFAULT_SIGMA, ge=0)
 
 
+def simulation_inputs_from_request(request: SimulationRequest) -> SimulationInputs:
+    return SimulationInputs(
+        initial_balance=request.initial_balance,
+        start_year=request.start_year,
+        start_quarter=request.start_quarter,
+        end_year=request.end_year,
+        end_quarter=request.end_quarter,
+        withdrawal_rules=tuple(WithdrawalRule(**rule.model_dump()) for rule in request.withdrawal_rules),
+        goal_year=request.end_year,
+        goal_quarter=request.end_quarter,
+        goal_balance=request.goal_balance,
+        goal_percentile=request.goal_percentile,
+        mu=request.mu,
+        sigma=request.sigma,
+        simulations=request.simulations,
+        seed=request.seed,
+    )
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(Path(STATIC_DIR) / "index.html", headers={"Cache-Control": "no-store"})
@@ -103,22 +122,7 @@ def get_history_stats(start_quarter: str) -> dict[str, object]:
 
 @app.post("/api/simulate")
 def post_simulation(request: SimulationRequest) -> dict[str, object]:
-    inputs = SimulationInputs(
-        initial_balance=request.initial_balance,
-        start_year=request.start_year,
-        start_quarter=request.start_quarter,
-        end_year=request.end_year,
-        end_quarter=request.end_quarter,
-        withdrawal_rules=tuple(WithdrawalRule(**rule.model_dump()) for rule in request.withdrawal_rules),
-        goal_year=request.goal_year,
-        goal_quarter=request.goal_quarter,
-        goal_balance=request.goal_balance,
-        goal_percentile=request.goal_percentile,
-        mu=request.mu,
-        sigma=request.sigma,
-        simulations=request.simulations,
-        seed=request.seed,
-    )
+    inputs = simulation_inputs_from_request(request)
     try:
         return simulation_payload(inputs)
     except ValueError as exc:
@@ -127,22 +131,7 @@ def post_simulation(request: SimulationRequest) -> dict[str, object]:
 
 @app.post("/api/ideal-withdrawal")
 def post_ideal_withdrawal(request: SimulationRequest) -> dict[str, object]:
-    inputs = SimulationInputs(
-        initial_balance=request.initial_balance,
-        start_year=request.start_year,
-        start_quarter=request.start_quarter,
-        end_year=request.end_year,
-        end_quarter=request.end_quarter,
-        withdrawal_rules=tuple(WithdrawalRule(**rule.model_dump()) for rule in request.withdrawal_rules),
-        goal_year=request.goal_year,
-        goal_quarter=request.goal_quarter,
-        goal_balance=request.goal_balance,
-        goal_percentile=request.goal_percentile,
-        mu=request.mu,
-        sigma=request.sigma,
-        simulations=request.simulations,
-        seed=request.seed,
-    )
+    inputs = simulation_inputs_from_request(request)
     try:
         return ideal_withdrawal_search(inputs)
     except ValueError as exc:
