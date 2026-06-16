@@ -107,6 +107,35 @@ def test_simulate_endpoint_defaults_withdrawal_rules_to_quarterly_intervals() ->
     assert response.json()["withdrawal_schedule"][:3] == [1000.0, 1000.0, 1000.0]
 
 
+def test_simulate_endpoint_accepts_negative_withdrawal_as_income() -> None:
+    response = client.post(
+        "/api/simulate",
+        json={
+            "initial_balance": 100000,
+            "end_year": 2026,
+            "end_quarter": 1,
+            "withdrawal_rules": [
+                {
+                    "name": "Salary",
+                    "amount": -1000,
+                    "start_year": 2026,
+                    "start_quarter": 1,
+                    "end_year": 2026,
+                    "end_quarter": 1,
+                }
+            ],
+            "mu": 0.0,
+            "sigma": 0.0,
+            "simulations": 100,
+            "seed": 42,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["withdrawal_schedule"][0] == -1000.0
+    assert payload["chart_percentiles"][3]["values"][1] == 101000.0
+
+
 def test_simulate_endpoint_uses_projection_end_as_goal_quarter() -> None:
     response = client.post(
         "/api/simulate",
@@ -155,3 +184,26 @@ def test_ideal_withdrawal_endpoint_returns_recommendation() -> None:
     assert payload["achieved_balance"] == 100000.0
     assert payload["target_quarter"] == "Q4 2026"
     assert payload["target_timing"] == "start"
+
+
+def test_ideal_withdrawal_endpoint_can_recommend_income() -> None:
+    response = client.post(
+        "/api/ideal-withdrawal",
+        json={
+            "initial_balance": 100000,
+            "start_year": 2025,
+            "start_quarter": 4,
+            "end_year": 2026,
+            "end_quarter": 4,
+            "goal_balance": 120000,
+            "goal_percentile": 5,
+            "mu": 0.0,
+            "sigma": 0.0,
+            "simulations": 100,
+            "seed": 1,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["recommended_withdrawal"] == -5000.0
+    assert payload["achieved_balance"] == 120000.0

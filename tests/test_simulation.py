@@ -57,6 +57,23 @@ def test_simulation_is_deterministic_when_sigma_is_zero() -> None:
     np.testing.assert_allclose(simulated, expected)
 
 
+def test_negative_withdrawal_increases_balance() -> None:
+    inputs = SimulationInputs(
+        initial_balance=100.0,
+        start_year=2025,
+        start_quarter=4,
+        end_year=2026,
+        end_quarter=1,
+        withdrawal_rules=(WithdrawalRule("Salary", -10.0, 2026, 1, 2026, 1),),
+        mu=0.0,
+        sigma=0.0,
+        simulations=3,
+        seed=7,
+    )
+    simulated = simulate_balances(inputs)
+    np.testing.assert_allclose(simulated[:, 1], [110.0, 110.0, 110.0])
+
+
 def test_payload_contains_twentile_rows_for_each_quarter_and_goal() -> None:
     payload = simulation_payload(
         SimulationInputs(
@@ -154,3 +171,26 @@ def test_ideal_withdrawal_search_replaces_primary_rule_amount() -> None:
     )
     assert result["recommended_withdrawal"] == 5_000.0
     assert result["achieved_balance"] == 100_000.0
+
+
+def test_ideal_withdrawal_search_can_recommend_negative_withdrawal() -> None:
+    result = ideal_withdrawal_search(
+        SimulationInputs(
+            initial_balance=100_000.0,
+            start_year=2025,
+            start_quarter=4,
+            end_year=2026,
+            end_quarter=4,
+            goal_year=2026,
+            goal_quarter=4,
+            goal_balance=120_000.0,
+            goal_percentile=5,
+            mu=0.0,
+            sigma=0.0,
+            simulations=10,
+            seed=1,
+        ),
+        step=100.0,
+    )
+    assert result["recommended_withdrawal"] == -5_000.0
+    assert result["achieved_balance"] == 120_000.0

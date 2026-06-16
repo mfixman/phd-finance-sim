@@ -75,13 +75,15 @@ function setStatus(message) {
 
 function updatePrimaryWithdrawalLabel(amount = Number(document.getElementById("primaryWithdrawalAmount").value)) {
   const label = document.getElementById("primaryWithdrawalAmountLabel");
-  label.textContent = amount > 0 ? `Amount (${currencyFormatter.format(amount)})` : "Amount";
+  if (label) {
+    label.textContent = amount > 0 ? currencyFormatter.format(amount) : "";
+  }
 }
 
 function updateGoalQuarterText(config = collectConfig()) {
   const target = document.getElementById("goalQuarterText");
   if (target) {
-    target.textContent = `Goal quarter: ${quarterLabel(config.end_year, config.end_quarter)} (projection end).`;
+    target.textContent = quarterLabel(config.end_year, config.end_quarter);
   }
 }
 
@@ -122,7 +124,7 @@ function normalizeRule(rule = {}, fallbackIndex = 0) {
   const endQuarter = Number(rule.end_quarter ?? startQuarter);
   return {
     name: String(rule.name || `Withdrawal ${fallbackIndex + 1}`),
-    amount: Math.max(0, Number(rule.amount || 0)),
+    amount: Number(rule.amount ?? 0),
     cadence: "quarterly",
     start_year: startYear,
     start_quarter: Number(rule.start_quarter ?? startQuarter),
@@ -371,7 +373,7 @@ function buildRuleCard(rule, index) {
   card.innerHTML = `
     <div class="rule-grid">
       <label><span>Name</span><input data-field="name" value="${escapeHtml(normalized.name)}" /></label>
-      <label><span>Amount</span><input data-field="amount" type="number" min="0" step="100" value="${normalized.amount}" /></label>
+      <label><span>Amount</span><input data-field="amount" type="number" step="100" value="${normalized.amount}" /></label>
       <label><span>Start year</span><input data-field="start_year" type="number" min="1900" max="2200" value="${normalized.start_year}" /></label>
       <label><span>Start Q</span><select data-field="start_quarter">${quarterOptions(normalized.start_quarter)}</select></label>
       <label><span>End year</span><input data-field="end_year" type="number" min="1900" max="2200" value="${normalized.end_year}" /></label>

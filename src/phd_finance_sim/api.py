@@ -44,7 +44,7 @@ class WithdrawalRuleRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     name: str = Field(default="Withdrawal")
-    amount: float = Field(default=0.0, ge=0)
+    amount: float = Field(default=0.0)
     start_year: int = Field(default=PROJECTION_START_YEAR)
     start_quarter: int = Field(default=PROJECTION_START_QUARTER, ge=1, le=4)
     end_year: int = Field(default=PROJECTION_END_YEAR)

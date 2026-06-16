@@ -6,9 +6,9 @@
     <meta http-equiv="Cache-Control" content="no-store" />
     <meta http-equiv="Pragma" content="no-cache" />
     <title>Unemployment Withdrawal Simulator</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260616-2" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260616-3" />
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
-    <script src="/static/app.js?v=20260616-2" defer></script>
+    <script src="/static/app.js?v=20260616-3" defer></script>
   </head>
   <body>
     <main class="layout">
@@ -104,10 +104,9 @@
           <h2>Goal</h2>
         </div>
         <div class="date-card">
-          <p id="goalQuarterText" class="inline-stat"></p>
           <div class="goal-row">
             <label>
-              <span>Balance</span>
+              <span>Final Balance</span>
               <input id="goalBalance" type="number" min="0" step="100" value="500000" />
             </label>
             <label>
@@ -120,9 +119,15 @@
         <div class="primary-withdrawal">
           <h3>Primary quarterly withdrawal</h3>
           <div class="primary-grid">
-            <label>
-              <span id="primaryWithdrawalAmountLabel">Amount</span>
-              <input id="primaryWithdrawalAmount" type="number" min="0" step="100" value="0" />
+            <label class="primary-amount-field">
+              <span id="primaryWithdrawalAmountLabel"></span>
+              <input
+                id="primaryWithdrawalAmount"
+                type="number"
+                step="100"
+                value="0"
+                aria-label="Primary quarterly withdrawal"
+              />
             </label>
           </div>
         </div>

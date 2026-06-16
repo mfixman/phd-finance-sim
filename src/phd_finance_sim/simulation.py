@@ -89,8 +89,6 @@ def projection_quarter_labels(
 
 
 def validate_rule(rule: WithdrawalRule) -> None:
-    if rule.amount < 0:
-        raise ValueError("Withdrawal rule amount cannot be negative")
     if rule.cadence not in CADENCES:
         raise ValueError(f"Unknown withdrawal cadence: {rule.cadence}")
     if quarter_index(rule.end_year, rule.end_quarter) < quarter_index(rule.start_year, rule.start_quarter):
@@ -279,27 +277,15 @@ def ideal_withdrawal_search(
             seed=inputs.seed,
         )
 
-    baseline_balance = percentile_balance_at_index(base_inputs, percentile=percentile, balance_index=target_index)
-    if baseline_balance <= target_balance:
-        return {
-            "recommended_withdrawal": 0.0,
-            "achieved_balance": baseline_balance,
-            "target_balance": target_balance,
-            "percentile": percentile,
-            "target_quarter": target_quarter,
-            "target_timing": "start",
-            "within_tolerance": abs(baseline_balance - target_balance) <= step,
-        }
-
-    low = 0.0
-    high = 1_000.0
+    low = -max_withdrawal
+    high = max_withdrawal
+    low_result = percentile_balance_at_index(with_quarterly_rule(low), balance_index=target_index, percentile=percentile)
     high_result = percentile_balance_at_index(with_quarterly_rule(high), balance_index=target_index, percentile=percentile)
-    while high_result > target_balance and high < max_withdrawal:
-        low = high
-        high = min(high * 2, max_withdrawal)
-        high_result = percentile_balance_at_index(
-            with_quarterly_rule(high), balance_index=target_index, percentile=percentile
-        )
+
+    if target_balance >= low_result:
+        low = high = -max_withdrawal
+    elif target_balance <= high_result:
+        low = high = max_withdrawal
 
     while high - low > step:
         mid = round(((low + high) / 2) / step) * step
@@ -311,18 +297,25 @@ def ideal_withdrawal_search(
         else:
             high = mid
 
-    candidates = sorted({round(value / step) * step for value in (low, high, max(0.0, low - step), high + step)})
-    best_withdrawal = 0.0
-    best_balance = baseline_balance
-    best_distance = abs(baseline_balance - target_balance)
+    candidates = sorted(
+        {
+            min(max_withdrawal, max(-max_withdrawal, round(value / step) * step))
+            for value in (low, high, low - step, high + step, 0.0)
+        }
+    )
+    best_withdrawal = candidates[0]
+    best_balance = percentile_balance_at_index(
+        with_quarterly_rule(best_withdrawal), balance_index=target_index, percentile=percentile
+    )
+    best_distance = abs(best_balance - target_balance)
     for candidate in candidates:
-        if candidate < 0 or candidate > max_withdrawal:
+        if candidate < -max_withdrawal or candidate > max_withdrawal:
             continue
         achieved = percentile_balance_at_index(
             with_quarterly_rule(candidate), balance_index=target_index, percentile=percentile
         )
         distance = abs(achieved - target_balance)
-        if distance < best_distance or (distance == best_distance and candidate < best_withdrawal):
+        if distance < best_distance or (distance == best_distance and abs(candidate) < abs(best_withdrawal)):
             best_withdrawal = candidate
             best_balance = achieved
             best_distance = distance
