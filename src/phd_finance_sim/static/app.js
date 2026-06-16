@@ -74,10 +74,8 @@ function setStatus(message) {
 }
 
 function updatePrimaryWithdrawalLabel(amount = Number(document.getElementById("primaryWithdrawalAmount").value)) {
-  const label = document.getElementById("primaryWithdrawalAmountLabel");
-  if (label) {
-    label.textContent = amount > 0 ? currencyFormatter.format(amount) : "";
-  }
+  document.getElementById("primaryWithdrawalAmount").title =
+    amount === 0 ? "Primary quarterly withdrawal" : currencyFormatter.format(amount);
 }
 
 function updateGoalQuarterText(config = collectConfig()) {

@@ -6,9 +6,9 @@
     <meta http-equiv="Cache-Control" content="no-store" />
     <meta http-equiv="Pragma" content="no-cache" />
     <title>Unemployment Withdrawal Simulator</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260616-3" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260616-4" />
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
-    <script src="/static/app.js?v=20260616-3" defer></script>
+    <script src="/static/app.js?v=20260616-4" defer></script>
   </head>
   <body>
     <main class="layout">
@@ -93,7 +93,7 @@
 
       <section class="panel rules-panel">
         <div class="panel-header">
-          <h2>Withdrawals</h2>
+          <h2>Additional Withdrawals</h2>
           <button id="addRule" type="button">Add rule</button>
         </div>
         <div id="rulesList" class="rules-list"></div>
@@ -120,7 +120,6 @@
           <h3>Primary quarterly withdrawal</h3>
           <div class="primary-grid">
             <label class="primary-amount-field">
-              <span id="primaryWithdrawalAmountLabel"></span>
               <input
                 id="primaryWithdrawalAmount"
                 type="number"

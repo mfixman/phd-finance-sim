@@ -136,6 +136,17 @@ body {
   margin-top: 14px;
 }
 
+.primary-withdrawal {
+  border-color: rgba(180, 83, 9, 0.45);
+  background: linear-gradient(135deg, rgba(255, 251, 244, 0.96), rgba(232, 244, 246, 0.92));
+  box-shadow: 0 12px 30px rgba(180, 83, 9, 0.14);
+}
+
+.primary-withdrawal h3 {
+  color: var(--accent-2);
+  font-size: 1.18rem;
+}
+
 .return-grid {
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
@@ -144,15 +155,17 @@ body {
   grid-template-columns: minmax(180px, 320px);
 }
 
+.primary-withdrawal input {
+  border-color: rgba(180, 83, 9, 0.35);
+  font-size: 1.08rem;
+  font-weight: 750;
+}
+
 label {
   display: grid;
   gap: 7px;
   font-size: 0.88rem;
   color: var(--muted);
-}
-
-.primary-amount-field span:empty {
-  display: none;
 }
 
 input,
