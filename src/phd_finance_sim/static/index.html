@@ -55,25 +55,6 @@
               </div>
             </div>
           </div>
-          <div class="date-card">
-            <h3>Goal</h3>
-            <label>
-              <span>Year</span>
-              <input id="goalYear" type="number" min="1900" max="2200" step="1" value="2029" />
-            </label>
-            <div id="goalQuarter" class="quarter-control" data-quarter="4"></div>
-            <div class="goal-row">
-              <label>
-                <span>Balance</span>
-                <input id="goalBalance" type="number" min="0" step="100" value="500000" />
-              </label>
-              <label>
-                <span>Percentile</span>
-                <input id="goalPercentile" type="number" min="1" max="99" step="1" value="5" />
-              </label>
-            </div>
-            <button id="idealWithdrawal" class="goal-action" type="button">Adjust withdrawal</button>
-          </div>
         </div>
 
         <div class="return-card">
@@ -148,6 +129,30 @@
           </div>
         </div>
         <div id="rulesList" class="rules-list"></div>
+      </section>
+
+      <section class="panel goal-panel">
+        <div class="panel-header">
+          <h2>Goal</h2>
+        </div>
+        <div class="date-card">
+          <label>
+            <span>Year</span>
+            <input id="goalYear" type="number" min="1900" max="2200" step="1" value="2029" />
+          </label>
+          <div id="goalQuarter" class="quarter-control" data-quarter="4"></div>
+          <div class="goal-row">
+            <label>
+              <span>Balance</span>
+              <input id="goalBalance" type="number" min="0" step="100" value="500000" />
+            </label>
+            <label>
+              <span>Percentile</span>
+              <input id="goalPercentile" type="number" min="1" max="99" step="1" value="5" />
+            </label>
+          </div>
+          <button id="idealWithdrawal" class="goal-action" type="button">Adjust withdrawal</button>
+        </div>
       </section>
 
       <section class="panel">
