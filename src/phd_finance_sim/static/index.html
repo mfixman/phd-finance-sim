@@ -6,9 +6,9 @@
     <meta http-equiv="Cache-Control" content="no-store" />
     <meta http-equiv="Pragma" content="no-cache" />
     <title>Unemployment Withdrawal Simulator</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260616-4" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260616-6" />
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
-    <script src="/static/app.js?v=20260616-4" defer></script>
+    <script src="/static/app.js?v=20260616-6" defer></script>
   </head>
   <body>
     <main class="layout">
@@ -43,21 +43,24 @@
         <div class="date-grid">
           <div class="date-card">
             <h3>Projection range</h3>
-            <div class="range-grid">
-              <div>
+            <div class="interval-row projection-interval">
+              <span class="range-bracket" aria-hidden="true">[</span>
+              <div class="interval-point">
                 <label>
                   <span>Start year</span>
                   <input id="projectionStartYear" type="number" min="1900" max="2200" step="1" value="2025" />
                 </label>
                 <div id="projectionStartQuarter" class="quarter-control" data-quarter="4"></div>
               </div>
-              <div>
+              <span class="range-bracket range-comma" aria-hidden="true">⸴</span>
+              <div class="interval-point">
                 <label>
                   <span>End year</span>
                   <input id="projectionEndYear" type="number" min="1900" max="2200" step="1" value="2029" />
                 </label>
                 <div id="projectionEndQuarter" class="quarter-control" data-quarter="4"></div>
               </div>
+              <span class="range-bracket" aria-hidden="true">)</span>
             </div>
           </div>
         </div>

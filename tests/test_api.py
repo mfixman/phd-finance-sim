@@ -77,7 +77,7 @@ def test_simulate_endpoint_applies_arbitrary_annual_withdrawal() -> None:
     assert payload["effective_initial_balance"] == 400_000.0
     assert payload["chart_percentiles"][3]["values"][0] == 400_000.0
     assert payload["chart_percentiles"][3]["values"][1] == 399_250.0
-    assert payload["chart_percentiles"][3]["values"][5] == 398_500.0
+    assert payload["chart_percentiles"][3]["values"][5] == 399_250.0
 
 
 def test_simulate_endpoint_defaults_withdrawal_rules_to_quarterly_intervals() -> None:
@@ -104,7 +104,7 @@ def test_simulate_endpoint_defaults_withdrawal_rules_to_quarterly_intervals() ->
         },
     )
     assert response.status_code == 200
-    assert response.json()["withdrawal_schedule"][:3] == [1000.0, 1000.0, 1000.0]
+    assert response.json()["withdrawal_schedule"][:3] == [1000.0, 1000.0, 0]
 
 
 def test_simulate_endpoint_accepts_negative_withdrawal_as_income() -> None:
@@ -121,7 +121,7 @@ def test_simulate_endpoint_accepts_negative_withdrawal_as_income() -> None:
                     "start_year": 2026,
                     "start_quarter": 1,
                     "end_year": 2026,
-                    "end_quarter": 1,
+                    "end_quarter": 2,
                 }
             ],
             "mu": 0.0,
@@ -180,8 +180,8 @@ def test_ideal_withdrawal_endpoint_returns_recommendation() -> None:
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["recommended_withdrawal"] == 5000.0
-    assert payload["achieved_balance"] == 100000.0
+    assert payload["recommended_withdrawal"] == 6700.0
+    assert payload["achieved_balance"] == 99900.0
     assert payload["target_quarter"] == "Q4 2026"
     assert payload["target_timing"] == "start"
 
@@ -205,5 +205,5 @@ def test_ideal_withdrawal_endpoint_can_recommend_income() -> None:
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["recommended_withdrawal"] == -5000.0
-    assert payload["achieved_balance"] == 120000.0
+    assert payload["recommended_withdrawal"] == -6700.0
+    assert payload["achieved_balance"] == 120100.0

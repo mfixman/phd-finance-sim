@@ -87,8 +87,7 @@ body {
 }
 
 .field-grid,
-.date-grid,
-.rule-grid {
+.date-grid {
   display: grid;
   gap: 12px;
 }
@@ -120,15 +119,10 @@ body {
   font-size: 1.08rem;
 }
 
-.range-grid,
 .return-grid,
 .primary-grid {
   display: grid;
   gap: 12px;
-}
-
-.range-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .return-card,
@@ -229,8 +223,9 @@ button:hover {
 
 .quarter-control {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, 54px);
   gap: 6px;
+  justify-content: start;
   margin-top: 10px;
 }
 
@@ -283,13 +278,74 @@ button:hover {
   margin-top: 14px;
 }
 
-.rule-grid {
-  grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 0.9fr) repeat(4, minmax(90px, 0.8fr)) auto;
+.rule-card {
+  display: grid;
+  gap: 14px;
+}
+
+.rule-card-header {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 1.4fr)
+    minmax(120px, 0.9fr)
+    minmax(120px, 0.8fr)
+    auto;
+  gap: 12px;
   align-items: end;
 }
 
 .rule-remove {
-  min-width: 82px;
+  width: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 8px;
+  font-size: 1.05rem;
+}
+
+.interval-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 78px 22px minmax(0, 1fr) 78px 22px;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid rgba(23, 32, 41, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.projection-interval {
+  margin-top: 12px;
+  grid-template-columns: 22px 280px 22px 280px 22px;
+  max-width: 650px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.rule-interval {
+  grid-template-columns: 22px minmax(90px, 0.8fr) 78px 22px minmax(90px, 0.8fr) 78px 22px;
+  max-width: 620px;
+}
+
+.interval-point {
+  min-width: 0;
+}
+
+.range-bracket {
+  align-self: end;
+  padding-bottom: 9px;
+  color: var(--accent-2);
+  font-family: "Iowan Old Style", "Palatino Linotype", serif;
+  font-size: 1.9rem;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+}
+
+.range-comma {
+  padding-bottom: 5px;
+  font-size: 2rem;
+  transform: translateY(1px);
 }
 
 .chart {
@@ -351,7 +407,7 @@ tbody th {
 }
 
 @media (max-width: 900px) {
-  .rule-grid,
+  .rule-card-header,
   .primary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -368,10 +424,18 @@ tbody th {
   }
 
   .goal-row,
-  .range-grid,
   .primary-grid,
-  .rule-grid {
+  .rule-card-header,
+  .interval-row {
     grid-template-columns: 1fr;
+  }
+
+  .range-bracket {
+    display: none;
+  }
+
+  .quarter-control {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .chart {

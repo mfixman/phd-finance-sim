@@ -100,7 +100,7 @@ def rule_applies_to_quarter(rule: WithdrawalRule, year: int, quarter: int) -> bo
     target_index = quarter_index(year, quarter)
     start_index = quarter_index(rule.start_year, rule.start_quarter)
     end_index = quarter_index(rule.end_year, rule.end_quarter)
-    if target_index < start_index or target_index > end_index:
+    if target_index < start_index or target_index >= end_index:
         return False
     if rule.cadence == "once":
         return target_index == start_index

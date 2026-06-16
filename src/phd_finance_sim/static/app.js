@@ -38,9 +38,9 @@ const DEFAULT_CONFIG = {
       amount: 0,
       start_year: 2025,
       start_quarter: 4,
-      end_year: 2025,
-      end_quarter: 4,
-      cadence: "quarterly",
+      end_year: 2026,
+      end_quarter: 1,
+      cadence: "once",
     },
   ],
   goal_year: 2029,
@@ -118,12 +118,18 @@ function buildQuarterControl(id, onChange) {
 function normalizeRule(rule = {}, fallbackIndex = 0) {
   const startYear = Number(rule.start_year ?? currentConfig.start_year);
   const startQuarter = Number(rule.start_quarter ?? currentConfig.start_quarter);
-  const endYear = Number(rule.end_year ?? startYear);
-  const endQuarter = Number(rule.end_quarter ?? startQuarter);
+  const [defaultEndYear, defaultEndQuarter] = quarterFromIndex(quarterIndex(startYear, startQuarter) + 1);
+  const cadence = ["once", "quarterly", "annual"].includes(rule.cadence) ? rule.cadence : "quarterly";
+  let endYear = Number(rule.end_year ?? defaultEndYear);
+  let endQuarter = Number(rule.end_quarter ?? defaultEndQuarter);
+  if (cadence === "once" && quarterIndex(endYear, endQuarter) <= quarterIndex(startYear, startQuarter)) {
+    endYear = defaultEndYear;
+    endQuarter = defaultEndQuarter;
+  }
   return {
     name: String(rule.name || `Withdrawal ${fallbackIndex + 1}`),
     amount: Number(rule.amount ?? 0),
-    cadence: "quarterly",
+    cadence,
     start_year: startYear,
     start_quarter: Number(rule.start_quarter ?? startQuarter),
     end_year: endYear,
@@ -157,47 +163,6 @@ function normalizePrimaryWithdrawal(rule = {}, timeline = currentConfig) {
 }
 
 function expandWithdrawalRule(rule = {}, index = 0) {
-  if (rule.special === "primary_quarterly") {
-    return [normalizeRule(rule, index)];
-  }
-
-  const cadence = ["once", "quarterly", "annual"].includes(rule.cadence) ? rule.cadence : "quarterly";
-  if (cadence === "annual") {
-    const startIndex = quarterIndex(Number(rule.start_year ?? currentConfig.start_year), Number(rule.start_quarter ?? currentConfig.start_quarter));
-    const endIndex = quarterIndex(Number(rule.end_year ?? currentConfig.end_year), Number(rule.end_quarter ?? currentConfig.end_quarter));
-    const rules = [];
-    for (let targetIndex = startIndex; targetIndex <= endIndex; targetIndex += 4) {
-      const [year, quarter] = quarterFromIndex(targetIndex);
-      rules.push(
-        normalizeRule(
-          {
-            ...rule,
-            name: `${rule.name || "Withdrawal"} ${year}`,
-            start_year: year,
-            start_quarter: quarter,
-            end_year: year,
-            end_quarter: quarter,
-          },
-          index + rules.length
-        )
-      );
-    }
-    return rules;
-  }
-
-  if (cadence === "once") {
-    return [
-      normalizeRule(
-        {
-          ...rule,
-          end_year: rule.start_year,
-          end_quarter: rule.start_quarter,
-        },
-        index
-      ),
-    ];
-  }
-
   return [normalizeRule(rule, index)];
 }
 
@@ -264,7 +229,7 @@ function normalizeConfig(config = {}) {
 function combinedWithdrawalRules(config, options = {}) {
   const primary = normalizePrimaryWithdrawal(config.primary_withdrawal, config);
   const primaryRule =
-    primary.amount > 0 || options.includeZeroPrimary
+    primary.amount !== 0 || options.includeZeroPrimary
       ? [
           {
             ...primary,
@@ -316,7 +281,7 @@ function collectConfig() {
     withdrawal_rules: Array.from(document.querySelectorAll(".rule-card")).map((card) => ({
       name: card.querySelector("[data-field='name']").value,
       amount: Number(card.querySelector("[data-field='amount']").value),
-      cadence: "quarterly",
+      cadence: card.querySelector("[data-field='cadence']").value,
       start_year: Number(card.querySelector("[data-field='start_year']").value),
       start_quarter: Number(card.querySelector("[data-field='start_quarter']").value),
       end_year: Number(card.querySelector("[data-field='end_year']").value),
@@ -369,16 +334,30 @@ function buildRuleCard(rule, index) {
   const card = document.createElement("div");
   card.className = "rule-card";
   card.innerHTML = `
-    <div class="rule-grid">
+    <div class="rule-card-header">
       <label><span>Name</span><input data-field="name" value="${escapeHtml(normalized.name)}" /></label>
       <label><span>Amount</span><input data-field="amount" type="number" step="100" value="${normalized.amount}" /></label>
+      <label>
+        <span>Cadence</span>
+        <select data-field="cadence">
+          <option value="once">Once</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="annual">Annual</option>
+        </select>
+      </label>
+      <button class="rule-remove" type="button" aria-label="Remove withdrawal">✕</button>
+    </div>
+    <div class="interval-row rule-interval">
+      <span class="range-bracket range-start" aria-hidden="true">[</span>
       <label><span>Start year</span><input data-field="start_year" type="number" min="1900" max="2200" value="${normalized.start_year}" /></label>
       <label><span>Start Q</span><select data-field="start_quarter">${quarterOptions(normalized.start_quarter)}</select></label>
+      <span class="range-bracket range-comma" aria-hidden="true">⸴</span>
       <label><span>End year</span><input data-field="end_year" type="number" min="1900" max="2200" value="${normalized.end_year}" /></label>
       <label><span>End Q</span><select data-field="end_quarter">${quarterOptions(normalized.end_quarter)}</select></label>
-      <button class="rule-remove" type="button">Remove</button>
+      <span class="range-bracket range-end" aria-hidden="true">)</span>
     </div>
   `;
+  card.querySelector("[data-field='cadence']").value = normalized.cadence;
   card.querySelector(".rule-remove").addEventListener("click", () => {
     card.remove();
     saveLocalConfig();
@@ -736,15 +715,16 @@ function bindInputs() {
 
 function addRuleFromCurrentRange() {
   const config = collectConfig();
+  const [endYear, endQuarter] = quarterFromIndex(quarterIndex(config.start_year, config.start_quarter) + 1);
   const rule = normalizeRule(
     {
       name: "Withdrawal",
       amount: 0,
-      cadence: "quarterly",
+      cadence: "once",
       start_year: config.start_year,
       start_quarter: config.start_quarter,
-      end_year: config.start_year,
-      end_quarter: config.start_quarter,
+      end_year: endYear,
+      end_quarter: endQuarter,
     },
     config.withdrawal_rules.length
   );
