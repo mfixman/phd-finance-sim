@@ -29,7 +29,7 @@ class WithdrawalRule:
     start_quarter: int
     end_year: int
     end_quarter: int
-    cadence: str = "once"
+    cadence: str = "quarterly"
     special: str | None = None
 
 

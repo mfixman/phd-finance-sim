@@ -49,7 +49,7 @@ class WithdrawalRuleRequest(BaseModel):
     start_quarter: int = Field(default=PROJECTION_START_QUARTER, ge=1, le=4)
     end_year: int = Field(default=PROJECTION_END_YEAR)
     end_quarter: int = Field(default=PROJECTION_END_QUARTER, ge=1, le=4)
-    cadence: str = Field(default="once")
+    cadence: str = Field(default="quarterly")
     special: str | None = Field(default=None)
 
 

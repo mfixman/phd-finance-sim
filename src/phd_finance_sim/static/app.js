@@ -40,7 +40,7 @@ const DEFAULT_CONFIG = {
       start_quarter: 4,
       end_year: 2025,
       end_quarter: 4,
-      cadence: "once",
+      cadence: "quarterly",
     },
   ],
   goal_year: 2029,
@@ -59,6 +59,7 @@ let historyRecords = [];
 let currentConfig = structuredClone(DEFAULT_CONFIG);
 let lastTwentileRows = [];
 let lastTwentileQuarters = [];
+let goalAdjustmentToken = 0;
 
 function quarterLabel(year, quarter) {
   return `Q${quarter} ${year}`;
@@ -117,26 +118,35 @@ function buildQuarterControl(id, onChange) {
 function normalizeRule(rule = {}, fallbackIndex = 0) {
   const startYear = Number(rule.start_year ?? currentConfig.start_year);
   const startQuarter = Number(rule.start_quarter ?? currentConfig.start_quarter);
+  const endYear = Number(rule.end_year ?? startYear);
+  const endQuarter = Number(rule.end_quarter ?? startQuarter);
   return {
     name: String(rule.name || `Withdrawal ${fallbackIndex + 1}`),
     amount: Math.max(0, Number(rule.amount || 0)),
-    cadence: ["once", "quarterly", "annual"].includes(rule.cadence) ? rule.cadence : "once",
+    cadence: "quarterly",
     start_year: startYear,
     start_quarter: Number(rule.start_quarter ?? startQuarter),
-    end_year: Number(rule.end_year ?? startYear),
-    end_quarter: Number(rule.end_quarter ?? startQuarter),
+    end_year: endYear,
+    end_quarter: endQuarter,
     ...(rule.special ? { special: String(rule.special) } : {}),
   };
 }
 
-function normalizePrimaryWithdrawal(rule = {}) {
+function normalizePrimaryWithdrawal(rule = {}, timeline = currentConfig) {
   const fallback = DEFAULT_CONFIG.primary_withdrawal;
+  const projectionRule = {
+    start_year: timeline.start_year,
+    start_quarter: timeline.start_quarter,
+    end_year: timeline.end_year,
+    end_quarter: timeline.end_quarter,
+  };
   return {
     ...fallback,
     ...normalizeRule(
       {
         ...fallback,
         ...rule,
+        ...projectionRule,
         name: "Primary quarterly withdrawal",
         cadence: "quarterly",
         special: "primary_quarterly",
@@ -144,6 +154,60 @@ function normalizePrimaryWithdrawal(rule = {}) {
       0
     ),
   };
+}
+
+function expandWithdrawalRule(rule = {}, index = 0) {
+  if (rule.special === "primary_quarterly") {
+    return [normalizeRule(rule, index)];
+  }
+
+  const cadence = ["once", "quarterly", "annual"].includes(rule.cadence) ? rule.cadence : "quarterly";
+  if (cadence === "annual") {
+    const startIndex = quarterIndex(Number(rule.start_year ?? currentConfig.start_year), Number(rule.start_quarter ?? currentConfig.start_quarter));
+    const endIndex = quarterIndex(Number(rule.end_year ?? currentConfig.end_year), Number(rule.end_quarter ?? currentConfig.end_quarter));
+    const rules = [];
+    for (let targetIndex = startIndex; targetIndex <= endIndex; targetIndex += 4) {
+      const [year, quarter] = quarterFromIndex(targetIndex);
+      rules.push(
+        normalizeRule(
+          {
+            ...rule,
+            name: `${rule.name || "Withdrawal"} ${year}`,
+            start_year: year,
+            start_quarter: quarter,
+            end_year: year,
+            end_quarter: quarter,
+          },
+          index + rules.length
+        )
+      );
+    }
+    return rules;
+  }
+
+  if (cadence === "once") {
+    return [
+      normalizeRule(
+        {
+          ...rule,
+          end_year: rule.start_year,
+          end_quarter: rule.start_quarter,
+        },
+        index
+      ),
+    ];
+  }
+
+  return [normalizeRule(rule, index)];
+}
+
+function quarterIndex(year, quarter) {
+  return year * 4 + quarter - 1;
+}
+
+function quarterFromIndex(index) {
+  const year = Math.floor(index / 4);
+  return [year, index % 4 + 1];
 }
 
 function normalizeMoneyValues(values = {}) {
@@ -166,7 +230,7 @@ function normalizeConfig(config = {}) {
   const endYear = Number(config.end_year ?? DEFAULT_CONFIG.end_year);
   const endQuarter = Number(config.end_quarter ?? DEFAULT_CONFIG.end_quarter);
   const rawRules = Array.isArray(config.withdrawal_rules) ? config.withdrawal_rules : DEFAULT_CONFIG.withdrawal_rules;
-  const incomingRules = rawRules.map((rule, index) => normalizeRule(rule, index));
+  const incomingRules = rawRules.flatMap((rule, index) => expandWithdrawalRule(rule, index));
   const primaryRule =
     config.primary_withdrawal || incomingRules.find((rule) => rule.special === "primary_quarterly");
 
@@ -187,13 +251,18 @@ function normalizeConfig(config = {}) {
     sigma: Math.max(0, Number(config.sigma ?? DEFAULT_CONFIG.sigma)),
     simulations: Math.min(250000, Math.max(1000, Number(config.simulations ?? DEFAULT_CONFIG.simulations))),
     seed: Math.max(0, Number(config.seed ?? DEFAULT_CONFIG.seed)),
-    primary_withdrawal: normalizePrimaryWithdrawal(primaryRule),
+    primary_withdrawal: normalizePrimaryWithdrawal(primaryRule, {
+      start_year: startYear,
+      start_quarter: startQuarter,
+      end_year: endYear,
+      end_quarter: endQuarter,
+    }),
     withdrawal_rules: incomingRules.filter((rule) => rule.special !== "primary_quarterly"),
   };
 }
 
 function combinedWithdrawalRules(config, options = {}) {
-  const primary = normalizePrimaryWithdrawal(config.primary_withdrawal);
+  const primary = normalizePrimaryWithdrawal(config.primary_withdrawal, config);
   const primaryRule =
     primary.amount > 0 || options.includeZeroPrimary
       ? [
@@ -239,15 +308,15 @@ function collectConfig() {
       amount: Number(document.getElementById("primaryWithdrawalAmount").value),
       cadence: "quarterly",
       special: "primary_quarterly",
-      start_year: Number(document.getElementById("primaryWithdrawalStartYear").value),
-      start_quarter: Number(document.getElementById("primaryWithdrawalStartQuarter").value),
-      end_year: Number(document.getElementById("primaryWithdrawalEndYear").value),
-      end_quarter: Number(document.getElementById("primaryWithdrawalEndQuarter").value),
+      start_year: Number(document.getElementById("projectionStartYear").value),
+      start_quarter: quarterValue("projectionStartQuarter"),
+      end_year: endYear,
+      end_quarter: endQuarter,
     },
     withdrawal_rules: Array.from(document.querySelectorAll(".rule-card")).map((card) => ({
       name: card.querySelector("[data-field='name']").value,
       amount: Number(card.querySelector("[data-field='amount']").value),
-      cadence: card.querySelector("[data-field='cadence']").value,
+      cadence: "quarterly",
       start_year: Number(card.querySelector("[data-field='start_year']").value),
       start_quarter: Number(card.querySelector("[data-field='start_quarter']").value),
       end_year: Number(card.querySelector("[data-field='end_year']").value),
@@ -270,10 +339,6 @@ function applyConfig(config) {
   document.getElementById("sigma").value = currentConfig.sigma;
   document.getElementById("primaryWithdrawalAmount").value = currentConfig.primary_withdrawal.amount;
   updatePrimaryWithdrawalLabel(currentConfig.primary_withdrawal.amount);
-  document.getElementById("primaryWithdrawalStartYear").value = currentConfig.primary_withdrawal.start_year;
-  document.getElementById("primaryWithdrawalStartQuarter").value = currentConfig.primary_withdrawal.start_quarter;
-  document.getElementById("primaryWithdrawalEndYear").value = currentConfig.primary_withdrawal.end_year;
-  document.getElementById("primaryWithdrawalEndQuarter").value = currentConfig.primary_withdrawal.end_quarter;
   renderRules(currentConfig.withdrawal_rules);
   if (currentConfig.history_start_quarter) {
     document.getElementById("startQuarter").value = currentConfig.history_start_quarter;
@@ -307,14 +372,6 @@ function buildRuleCard(rule, index) {
     <div class="rule-grid">
       <label><span>Name</span><input data-field="name" value="${escapeHtml(normalized.name)}" /></label>
       <label><span>Amount</span><input data-field="amount" type="number" min="0" step="100" value="${normalized.amount}" /></label>
-      <label>
-        <span>Cadence</span>
-        <select data-field="cadence">
-          <option value="once">Once</option>
-          <option value="quarterly">Quarterly</option>
-          <option value="annual">Annual</option>
-        </select>
-      </label>
       <label><span>Start year</span><input data-field="start_year" type="number" min="1900" max="2200" value="${normalized.start_year}" /></label>
       <label><span>Start Q</span><select data-field="start_quarter">${quarterOptions(normalized.start_quarter)}</select></label>
       <label><span>End year</span><input data-field="end_year" type="number" min="1900" max="2200" value="${normalized.end_year}" /></label>
@@ -322,16 +379,15 @@ function buildRuleCard(rule, index) {
       <button class="rule-remove" type="button">Remove</button>
     </div>
   `;
-  card.querySelector("[data-field='cadence']").value = normalized.cadence;
   card.querySelector(".rule-remove").addEventListener("click", () => {
     card.remove();
     saveLocalConfig();
-    runSimulation();
+    adjustWithdrawalToGoal().catch((error) => setStatus(`Error: ${error.message}`));
   });
   card.querySelectorAll("input, select").forEach((input) => {
     input.addEventListener("change", () => {
       saveLocalConfig();
-      runSimulation();
+      adjustWithdrawalToGoal().catch((error) => setStatus(`Error: ${error.message}`));
     });
   });
   return card;
@@ -559,6 +615,15 @@ function handleTwentileCellClick(event) {
     nextRows = selectedRows.filter((selectedRow) => selectedRow !== rowIndex);
   } else if (selectedRows.length === 1 && Math.abs(selectedRows[0] - rowIndex) === 1) {
     nextRows = [...selectedRows, rowIndex].sort((left, right) => left - right);
+  } else if (selectedRows.length === 2) {
+    const [lowerRow, upperRow] = selectedRows;
+    if (rowIndex === lowerRow - 1) {
+      nextRows = [rowIndex, lowerRow];
+    } else if (rowIndex === upperRow + 1) {
+      nextRows = [upperRow, rowIndex];
+    } else {
+      nextRows = [rowIndex];
+    }
   } else {
     nextRows = [rowIndex];
   }
@@ -612,20 +677,32 @@ async function runSimulation() {
   setStatus(`Projection range: ${result.quarters[0]} to ${result.quarters.at(-1)}.`);
 }
 
-async function findIdealWithdrawal() {
+async function findIdealWithdrawal(options = {}) {
+  const token = ++goalAdjustmentToken;
   const config = collectConfig();
   const result = await fetchJson("/api/ideal-withdrawal", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(exportConfig(config, { includeZeroPrimary: true })),
   });
+  if (token !== goalAdjustmentToken) {
+    return result;
+  }
   document.getElementById("primaryWithdrawalAmount").value = result.recommended_withdrawal.toFixed(0);
   updatePrimaryWithdrawalLabel(result.recommended_withdrawal);
   await runSimulation();
-  document.getElementById("idealWithdrawalResult").textContent =
-    `Primary quarterly withdrawal set to target P${result.percentile} ${currencyFormatter.format(result.target_balance)} ` +
-    `at ${result.target_quarter}: ${currencyFormatter.format(result.recommended_withdrawal)}. ` +
-    `Achieved: ${currencyFormatter.format(result.achieved_balance)}.`;
+  if (options.showResult !== false) {
+    document.getElementById("idealWithdrawalResult").textContent =
+      `Primary quarterly withdrawal set to target P${result.percentile} ${currencyFormatter.format(result.target_balance)} ` +
+      `at ${result.target_quarter}: ${currencyFormatter.format(result.recommended_withdrawal)}. ` +
+      `Achieved: ${currencyFormatter.format(result.achieved_balance)}.`;
+  }
+  return result;
+}
+
+async function adjustWithdrawalToGoal() {
+  document.getElementById("idealWithdrawalResult").textContent = "";
+  await findIdealWithdrawal({ showResult: false });
 }
 
 function bindInputs() {
@@ -633,15 +710,26 @@ function bindInputs() {
     if (input.id === "configFile") {
       return;
     }
-    input.addEventListener("change", () => {
-      document.getElementById("idealWithdrawalResult").textContent = "";
-      if (input.id === "primaryWithdrawalAmount") {
-        updatePrimaryWithdrawalLabel(Number(input.value));
+    input.addEventListener("change", async () => {
+      try {
+        document.getElementById("idealWithdrawalResult").textContent = "";
+        if (input.id === "primaryWithdrawalAmount") {
+          updatePrimaryWithdrawalLabel(Number(input.value));
+          await runSimulation();
+          return;
+        }
+        if (input.id === "startQuarter") {
+          await applyHistoryStats();
+          await adjustWithdrawalToGoal();
+          return;
+        }
+        if (input.id === "projectionEndYear") {
+          updateGoalQuarterText();
+        }
+        await adjustWithdrawalToGoal();
+      } catch (error) {
+        setStatus(`Error: ${error.message}`);
       }
-      if (input.id === "projectionEndYear") {
-        updateGoalQuarterText();
-      }
-      runSimulation().catch((error) => setStatus(`Error: ${error.message}`));
     });
   });
 }
@@ -652,7 +740,7 @@ function addRuleFromCurrentRange() {
     {
       name: "Withdrawal",
       amount: 0,
-      cadence: "once",
+      cadence: "quarterly",
       start_year: config.start_year,
       start_quarter: config.start_quarter,
       end_year: config.start_year,
@@ -662,6 +750,7 @@ function addRuleFromCurrentRange() {
   );
   document.getElementById("rulesList").appendChild(buildRuleCard(rule, config.withdrawal_rules.length));
   saveLocalConfig();
+  adjustWithdrawalToGoal().catch((error) => setStatus(`Error: ${error.message}`));
 }
 
 async function importConfig(file) {
@@ -669,15 +758,17 @@ async function importConfig(file) {
   const config = normalizeConfig(JSON.parse(text));
   applyConfig(config);
   saveLocalConfig();
-  await runSimulation();
+  await adjustWithdrawalToGoal();
   setStatus(`Loaded ${file.name}.`);
 }
 
 async function init() {
-  buildQuarterControl("projectionStartQuarter", () => runSimulation().catch((error) => setStatus(`Error: ${error.message}`)));
+  buildQuarterControl("projectionStartQuarter", () => {
+    adjustWithdrawalToGoal().catch((error) => setStatus(`Error: ${error.message}`));
+  });
   buildQuarterControl("projectionEndQuarter", () => {
     updateGoalQuarterText();
-    runSimulation().catch((error) => setStatus(`Error: ${error.message}`));
+    adjustWithdrawalToGoal().catch((error) => setStatus(`Error: ${error.message}`));
   });
 
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -690,10 +781,10 @@ async function init() {
   await loadHistoryData();
   await applyHistoryStats();
   bindInputs();
-  await runSimulation();
+  await adjustWithdrawalToGoal();
 
   document.getElementById("useHistory").addEventListener("click", () => {
-    applyHistoryStats().then(runSimulation).catch((error) => setStatus(`Error: ${error.message}`));
+    applyHistoryStats().then(adjustWithdrawalToGoal).catch((error) => setStatus(`Error: ${error.message}`));
   });
   document.getElementById("runSimulation").addEventListener("click", () => {
     runSimulation().catch((error) => setStatus(`Error: ${error.message}`));
@@ -705,7 +796,7 @@ async function init() {
   document.getElementById("resetConfig").addEventListener("click", () => {
     localStorage.removeItem(STORAGE_KEY);
     applyConfig(DEFAULT_CONFIG);
-    runSimulation().catch((error) => setStatus(`Error: ${error.message}`));
+    adjustWithdrawalToGoal().catch((error) => setStatus(`Error: ${error.message}`));
   });
   document.getElementById("saveConfig").addEventListener("click", () => {
     saveLocalConfig();

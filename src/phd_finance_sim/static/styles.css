@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   --bg: #f4f6f3;
-  --panel: rgba(255, 255, 255, 0.88);
+  --panel: rgba(255, 255, 255, 0.82);
   --ink: #172029;
   --muted: #58636e;
   --accent: #176b87;
@@ -21,8 +21,8 @@ body {
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   color: var(--ink);
   background:
-    linear-gradient(180deg, rgba(251, 251, 248, 0.16), rgba(244, 246, 243, 0.5)),
-    url("/static/japanese-nature-bg.png") center top / cover no-repeat,
+    linear-gradient(180deg, rgba(251, 251, 248, 0.03), rgba(244, 246, 243, 0.18)),
+    url("/static/japanese-nature-bg.png") center center / cover no-repeat,
     var(--bg);
   background-attachment: fixed;
 }
@@ -109,7 +109,7 @@ body {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
-  background: #fbfcfb;
+  background: rgba(251, 252, 251, 0.86);
 }
 
 .date-card h3,
@@ -140,7 +140,7 @@ body {
 }
 
 .primary-grid {
-  grid-template-columns: minmax(150px, 1.1fr) repeat(4, minmax(90px, 0.8fr));
+  grid-template-columns: minmax(180px, 320px);
 }
 
 label {
@@ -266,7 +266,7 @@ button:hover {
 }
 
 .rule-grid {
-  grid-template-columns: minmax(150px, 1.3fr) minmax(120px, 0.8fr) minmax(130px, 0.8fr) repeat(4, minmax(90px, 0.7fr)) auto;
+  grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 0.9fr) repeat(4, minmax(90px, 0.8fr)) auto;
   align-items: end;
 }
 
